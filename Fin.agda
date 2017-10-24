@@ -36,6 +36,28 @@ add-plus : ∀ n m -> Add n m (n +N m)
 add-plus zero m = zero+n m
 add-plus (suc n) m = add-suc-left n m (n +N m) (add-plus n m)
 
+plus-zero : ∀ n -> n +N 0 ≡ n
+plus-zero zero = refl
+plus-zero (suc n) rewrite plus-zero n = refl
+
+suc-plus-suc : ∀ n m -> suc (n +N suc m) ≡ suc (suc (n +N m))
+suc-plus-suc zero m = refl
+suc-plus-suc (suc n) m rewrite suc-plus-suc n m = refl
+
+add-plus-eq : ∀ l m n -> Add l m n -> l +N m ≡ n
+add-plus-eq .0 m .m (zero+n .m) = refl
+add-plus-eq l .0 .l (n+zero .l) rewrite plus-zero l = refl
+add-plus-eq .(suc l) .(suc m) .(suc (suc n)) (suc-suc l m n p) rewrite suc-plus-suc l m | add-plus-eq l m n p = refl
+
+sym : ∀ {a} {A : Set a} {x y : A} → x ≡ y → y ≡ x
+sym refl = refl
+
+plus-eq-add : ∀ l m n -> l +N m ≡ n -> Add l m n
+plus-eq-add zero m n p rewrite p = zero+n n
+plus-eq-add (suc l) zero n p rewrite plus-zero l | p = n+zero n
+plus-eq-add (suc l) (suc m) n p rewrite suc-plus-suc l m | sym p = suc-suc l m (l +N m) (plus-eq-add l m (l +N m) refl)
+
+
 data Size : Type -> Nat -> Set where
   size-empty : Size Empty 0
   size-unit : Size Unit 1
