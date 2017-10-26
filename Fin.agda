@@ -88,6 +88,10 @@ module AddLemmas where
   plus-eq-add (suc l) (suc m) zero ()
   plus-eq-add (suc l) (suc m) (suc .(l +N suc m)) refl rewrite plus-suc-eq-suc-plus l m = add-suc l (suc m) (suc (l +N m)) (add-suc-right l m (l +N m) (plus-eq-add l m (l +N m) refl))
 
+  add-zero-right-eq : ∀ l m -> Add l 0 m -> l ≡ m
+  add-zero-right-eq .0 .0 (add-zero .0) = refl
+  add-zero-right-eq .(suc l) .(suc n) (add-suc l .0 n a) rewrite add-zero-right-eq l n a = refl
+
 data Size : Type -> Nat -> Set where
   size-empty : Size Empty 0
   size-unit : Size Unit 1
@@ -139,6 +143,13 @@ fin-to-nat-fill-right-suc .(suc n) (fsuc n f) = refl
 fill-right : ∀ l m n -> Add l m n -> Fin m -> Fin n
 fill-right .0 m .m (add-zero .m) fin = fin
 fill-right .(suc l) m .(suc n) (add-suc l .m n a) fin = fsuc n (fill-right l m n a fin)
+
+size-left-empty : (T : Type) -> (cT : Nat) -> Size (Empty + T) cT -> Size T cT
+size-left-empty T cT (size+ .0 .cT .cT .Empty .T size-empty sizeT (add-zero .cT)) = sizeT
+
+size-right-empty : (T : Type) -> (cT : Nat) -> Size (T + Empty) cT -> Size T cT
+size-right-empty T .0 (size+ .0 .0 .0 .T .Empty s size-empty (add-zero .0)) = s
+size-right-empty T .(suc n) (size+ .(suc l) .0 .(suc n) .T .Empty s size-empty (add-suc l .0 n x)) rewrite AddLemmas.add-zero-right-eq l n x = s
 
 encode : (T : Type) -> (cT : Nat) -> Size T cT -> Value T -> Fin cT
 encode .Unit .1 size-unit unit = fzero zero
@@ -209,3 +220,10 @@ module DecodeExamples where
  
   example-decode2c : let T = (Unit + Unit) + Unit in decode' T (make-size T) (fsuc _ (fsuc _ (fzero _))) ≡ inr _ _ unit
   example-decode2c = refl
+
+encode-decode : (T : Type) -> (cT : Nat) -> (s : Size T cT) -> (v : Value T) -> decode T cT s (encode T cT s v) ≡ v
+encode-decode .Unit .1 size-unit unit = refl
+encode-decode .(S + T) cST (size+ cS cT .cST .S .T sizeS sizeT x) (inl S T vS) with split cS cT cST x (fill-left cS cT cST x (encode S cS sizeS vS))
+encode-decode .(S + T) cST (size+ cS cT .cST .S .T sizeS sizeT x) (inl S T vS) | inl' finS = {!!}
+encode-decode .(S + T) cST (size+ cS cT .cST .S .T sizeS sizeT x) (inl S T vS) | inr' finT = {!!}
+encode-decode .(S + T) cST (size+ cS cT .cST .S .T sizeS sizeT x) (inr S T vT) = {!!}
