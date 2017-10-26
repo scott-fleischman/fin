@@ -153,3 +153,13 @@ module EncodeExamples where
 
   example-encoding3d : encode-nat ((Unit + (Unit + (Unit + Unit))) + Unit) (inr _ _ unit) ≡ 4
   example-encoding3d = refl
+
+decode : (T : Type) -> (cT : Nat) -> Size T cT -> Fin cT -> Value T
+decode Empty zero size-empty ()
+decode Empty (suc cT) () fin
+decode Unit zero () fin
+decode Unit (suc .0) size-unit (fzero .0) = unit
+decode Unit (suc .0) size-unit (fsuc .0 ())
+decode (S + T) zero (size+ cS cT .0 .S .T sizeS sizeT x) ()
+decode (S + T) (suc cST) (size+ cS cT .(suc cST) .S .T sizeS sizeT x) (fzero .cST) = {!!}
+decode (S + T) (suc cST) (size+ cS cT .(suc cST) .S .T sizeS sizeT x) (fsuc .cST fin) = {!!}
