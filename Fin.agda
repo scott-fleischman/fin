@@ -154,12 +154,18 @@ module EncodeExamples where
   example-encoding3d : encode-nat ((Unit + (Unit + (Unit + Unit))) + Unit) (inr _ _ unit) ≡ 4
   example-encoding3d = refl
 
+data _+'_ (A B : Set) : Set where
+  inl' : A -> A +' B
+  inr' : B -> A +' B
+
+split : ∀ l m n -> Add l m n -> Fin n -> Fin l +' Fin m
+split l m n a fin = {!!}
+
 decode : (T : Type) -> (cT : Nat) -> Size T cT -> Fin cT -> Value T
-decode Empty zero size-empty ()
-decode Empty (suc cT) () fin
+decode Empty .0 size-empty ()
 decode Unit zero () fin
 decode Unit (suc .0) size-unit (fzero .0) = unit
 decode Unit (suc .0) size-unit (fsuc .0 ())
-decode (S + T) zero (size+ cS cT .0 .S .T sizeS sizeT x) ()
-decode (S + T) (suc cST) (size+ cS cT .(suc cST) .S .T sizeS sizeT x) (fzero .cST) = {!!}
-decode (S + T) (suc cST) (size+ cS cT .(suc cST) .S .T sizeS sizeT x) (fsuc .cST fin) = {!!}
+decode (S + T) cST (size+ cS cT .cST .S .T sizeS sizeT x) fin with split cS cT cST x fin
+decode (S + T) cST (size+ cS cT .cST .S .T sizeS sizeT x) fin | inl' finS = inl S T (decode S cS sizeS finS)
+decode (S + T) cST (size+ cS cT .cST .S .T sizeS sizeT x) fin | inr' finT = inr S T (decode T cT sizeT finT)
