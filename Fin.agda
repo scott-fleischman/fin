@@ -249,16 +249,16 @@ decode' (sized-type cardinality size) fin = decode size fin
 module DecodeExamples where
   example-decode1a : let T = Unit + Unit in decode' (make-size T) (fzero _) ≡ inl unit
   example-decode1a = refl
- 
+
   example-decode1b : let T = Unit + Unit in decode' (make-size T) (fsuc _ (fzero _)) ≡ inr unit
   example-decode1b = refl
- 
+
   example-decode2a : let T = (Unit + Unit) + Unit in decode' (make-size T) (fzero _) ≡ inl (inl unit)
   example-decode2a = refl
- 
+
   example-decode2b : let T = (Unit + Unit) + Unit in decode' (make-size T) (fsuc _ (fzero  _)) ≡ inl (inr unit)
   example-decode2b = refl
- 
+
   example-decode2c : let T = (Unit + Unit) + Unit in decode' (make-size T) (fsuc _ (fsuc _ (fzero _))) ≡ inr unit
   example-decode2c = refl
 
