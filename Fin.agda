@@ -196,17 +196,17 @@ size-right-empty : (T : Type) -> (cT : Nat) -> Size (T + Empty) cT -> Size T cT
 size-right-empty T .0 (size+ s size-empty (add-zero .0)) = s
 size-right-empty T .(suc n) (size+ s size-empty (add-suc l .0 n x)) rewrite AddLemmas.add-zero-right-eq l n x = s
 
-encode : (T : Type) -> {cT : Nat} -> Size T cT -> Value T -> Fin cT
-encode .Unit size-unit unit = fzero zero
-encode (S + T) (size+ sizeS sizeT x) (inl value) = fill-left x (encode S sizeS value)
-encode (S + T) (size+ sizeS sizeT x) (inr value) = fill-right x (encode T sizeT value)
+encode : {T : Type} -> {cT : Nat} -> Size T cT -> Value T -> Fin cT
+encode size-unit unit = fzero zero
+encode (size+ sizeS sizeT x) (inl value) = fill-left x (encode sizeS value)
+encode (size+ sizeS sizeT x) (inr value) = fill-right x (encode sizeT value)
 
-encode' : (T : Type) -> (s : SizedType T) -> Value T -> Fin (SizedType.cardinality s)
-encode' T (sized-type cardinality size) v = encode T size v
+encode' : {T : Type} -> (s : SizedType T) -> Value T -> Fin (SizedType.cardinality s)
+encode' (sized-type cardinality size) v = encode size v
 
 encode-nat : (T : Type) -> Value T -> Nat
 encode-nat T v with make-size T
-encode-nat T v | sized-type cardinality size = fin-to-nat (encode' T (sized-type cardinality size) v)
+encode-nat T v | sized-type cardinality size = fin-to-nat (encode' (sized-type cardinality size) v)
 
 module EncodeExamples where
   example-encoding1a : encode-nat (Unit + Unit) (inl unit) ≡ 0
@@ -227,42 +227,49 @@ module EncodeExamples where
   example-encoding3d : encode-nat ((Unit + (Unit + (Unit + Unit))) + Unit) (inr unit) ≡ 4
   example-encoding3d = refl
 
-decode : (T : Type) -> {cT : Nat} -> Size T cT -> Fin cT -> Value T
+decode : {T : Type} -> {cT : Nat} -> Size T cT -> Fin cT -> Value T
 decode-aux : ∀ {cS cT S T} -> Size S cS -> Size T cT -> Fin cS +' Fin cT -> Value (S + T)
 
-decode Empty size-empty ()
-decode Unit size-unit (fzero .0) = unit
-decode Unit size-unit (fsuc .0 ())
-decode (S + T) (size+ sizeS sizeT x) fin = decode-aux sizeS sizeT (split-fin x fin)
+decode size-empty ()
+decode size-unit (fzero .0) = unit
+decode size-unit (fsuc .0 ())
+decode (size+ sizeS sizeT x) fin = decode-aux sizeS sizeT (split-fin x fin)
 
-decode-aux {S = S} sizeS sizeT (inl' finS) = inl (decode S sizeS finS)
-decode-aux {T = T} sizeS sizeT (inr' finT) = inr (decode T sizeT finT)
+decode-aux {S = S} sizeS sizeT (inl' finS) = inl (decode sizeS finS)
+decode-aux {T = T} sizeS sizeT (inr' finT) = inr (decode sizeT finT)
 
 
-decode' : (T : Type) -> (s : SizedType T) -> Fin (SizedType.cardinality s) -> Value T
-decode' T (sized-type cardinality size) fin = decode T size fin
+decode' : {T : Type} -> (s : SizedType T) -> Fin (SizedType.cardinality s) -> Value T
+decode' (sized-type cardinality size) fin = decode size fin
 
 
 -- decode-fill-left : (S T : Type) -> (cS cT cST : Nat) -> (sizeS : Size S cS) -> (sizeT : Size T cT) -> (d : Fin cS) -> decode
 
 
 module DecodeExamples where
-  example-decode1a : let T = Unit + Unit in decode' T (make-size T) (fzero _) ≡ inl unit
+  example-decode1a : let T = Unit + Unit in decode' (make-size T) (fzero _) ≡ inl unit
   example-decode1a = refl
  
-  example-decode1b : let T = Unit + Unit in decode' T (make-size T) (fsuc _ (fzero _)) ≡ inr unit
+  example-decode1b : let T = Unit + Unit in decode' (make-size T) (fsuc _ (fzero _)) ≡ inr unit
   example-decode1b = refl
  
-  example-decode2a : let T = (Unit + Unit) + Unit in decode' T (make-size T) (fzero _) ≡ inl (inl unit)
+  example-decode2a : let T = (Unit + Unit) + Unit in decode' (make-size T) (fzero _) ≡ inl (inl unit)
   example-decode2a = refl
  
-  example-decode2b : let T = (Unit + Unit) + Unit in decode' T (make-size T) (fsuc _ (fzero  _)) ≡ inl (inr unit)
+  example-decode2b : let T = (Unit + Unit) + Unit in decode' (make-size T) (fsuc _ (fzero  _)) ≡ inl (inr unit)
   example-decode2b = refl
  
-  example-decode2c : let T = (Unit + Unit) + Unit in decode' T (make-size T) (fsuc _ (fsuc _ (fzero _))) ≡ inr unit
+  example-decode2c : let T = (Unit + Unit) + Unit in decode' (make-size T) (fsuc _ (fsuc _ (fzero _))) ≡ inr unit
   example-decode2c = refl
 
-encode-decode : (T : Type) -> {cT : Nat} -> (s : Size T cT) -> (v : Value T) -> decode T s (encode T s v) ≡ v
-encode-decode .Unit size-unit unit = refl
-encode-decode .(_ + _) (size+ {S = S} s t x) (inl v) rewrite split-fin-fill-left (encode S s v) x | encode-decode S s v = refl
-encode-decode .(_ + _) (size+ {T = T} s t x) (inr v) rewrite split-fin-fill-right (encode T t v) x | encode-decode T t v = refl
+decode-encode : {T : Type} -> {cT : Nat} -> (s : Size T cT) -> (v : Value T) -> decode s (encode s v) ≡ v
+decode-encode size-unit unit = refl
+decode-encode (size+ s t x) (inl v) rewrite split-fin-fill-left (encode s v) x | decode-encode s v = refl
+decode-encode (size+ s t x) (inr v) rewrite split-fin-fill-right (encode t v) x | decode-encode t v = refl
+
+encode-decode : {T : Type} -> {cT : Nat} -> (s : Size T cT) -> (f : Fin cT) -> encode s (decode s f) ≡ f
+encode-decode size-unit (fzero .0) = refl
+encode-decode size-unit (fsuc .0 ())
+encode-decode (size+ s t (add-zero n)) f rewrite encode-decode t f = refl
+encode-decode (size+ s t (add-suc l m n x)) (fzero .n) rewrite encode-decode s (fzero l) = refl
+encode-decode (size+ s t (add-suc l m n x)) (fsuc .n f) = {!!}
