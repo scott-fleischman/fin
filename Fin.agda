@@ -16,6 +16,9 @@ data _≡_ {A : Set} (x : A) : A → Set where
   instance refl : x ≡ x
 {-# BUILTIN EQUALITY _≡_ #-}
 
+sym : ∀ {A : Set} -> {x y : A} -> x ≡ y -> y ≡ x
+sym refl = refl
+
 
 data _+'_ (A B : Set) : Set where
   inl' : A -> A +' B
@@ -33,15 +36,13 @@ add-zero-right : ∀ n -> Add n 0 n
 add-zero-right zero = add-zero zero
 add-zero-right (suc n) = add-suc n zero n (add-zero-right n)
 
-add-suc-right : ∀ l m n -> Add l m n -> Add l (suc m) (suc n)
-add-suc-right zero zero zero (add-zero .0) = add-zero 1
-add-suc-right zero zero (suc n) ()
-add-suc-right zero (suc m) zero ()
-add-suc-right zero (suc m) (suc .m) (add-zero .(suc m)) = add-zero (suc (suc m))
-add-suc-right (suc l) zero zero ()
-add-suc-right (suc l) zero (suc n) (add-suc .l .0 .n a) = add-suc l 1 (suc n) (add-suc-right l zero n a)
-add-suc-right (suc l) (suc m) zero ()
-add-suc-right (suc l) (suc m) (suc n) (add-suc .l .(suc m) .n a) = add-suc l (suc (suc m)) (suc n) (add-suc-right l (suc m) n a)
+add-suc-left : ∀ {l m n} -> Add l m n -> Add (suc l) m (suc n)
+add-suc-left (add-zero n) = add-suc zero n n (add-zero n)
+add-suc-left (add-suc l m n a) = add-suc (suc l) m (suc n) (add-suc l m n a)
+
+add-suc-right : ∀ {l m n} -> Add l m n -> Add l (suc m) (suc n)
+add-suc-right (add-zero n) = add-zero (suc n)
+add-suc-right (add-suc l m n a) = add-suc l (suc m) (suc n) (add-suc-right a)
 
 add-plus : ∀ n m -> Add n m (n +N m)
 add-plus zero m = add-zero m
@@ -50,7 +51,7 @@ add-plus (suc n) m = add-suc n m (n +N m) (add-plus n m)
 add-commute : ∀ {l m n} -> Add l m n -> Add m l n
 add-commute (add-zero zero) = add-zero zero
 add-commute (add-zero (suc n)) = add-suc n zero n (add-commute (add-zero n))
-add-commute (add-suc l m n a) = add-suc-right m l n (add-commute a)
+add-commute (add-suc l m n a) = add-suc-right (add-commute a)
 
 module AddLemmas where
   plus-zero : ∀ n -> n +N 0 ≡ n
@@ -72,14 +73,9 @@ module AddLemmas where
   add-plus-eq .(suc l) m .(suc n) (add-suc l .m n a) rewrite add-plus-eq l m n a = refl
 
   plus-eq-add : ∀ l m n -> l +N m ≡ n -> Add l m n
-  plus-eq-add zero zero zero refl = add-zero zero
-  plus-eq-add zero zero (suc n) ()
-  plus-eq-add zero (suc m) zero ()
-  plus-eq-add zero (suc m) (suc .m) refl = add-zero (suc m)
-  plus-eq-add (suc l) zero zero ()
-  plus-eq-add (suc l) zero (suc .(l +N 0)) refl rewrite plus-zero l = add-suc l 0 l (add-zero-right l)
-  plus-eq-add (suc l) (suc m) zero ()
-  plus-eq-add (suc l) (suc m) (suc .(l +N suc m)) refl rewrite plus-suc-eq-suc-plus l m = add-suc l (suc m) (suc (l +N m)) (add-suc-right l m (l +N m) (plus-eq-add l m (l +N m) refl))
+  plus-eq-add zero m .m refl = add-zero m
+  plus-eq-add (suc l) zero n refl rewrite plus-zero l = add-suc-left (add-zero-right l)
+  plus-eq-add (suc l) (suc m) n p rewrite plus-suc-eq-suc-plus l m | sym p = add-suc l (suc m) (suc (l +N m)) (add-suc-right (plus-eq-add l m (l +N m) refl))
 
   add-zero-right-eq : ∀ l m -> Add l 0 m -> l ≡ m
   add-zero-right-eq .0 .0 (add-zero .0) = refl
@@ -94,18 +90,22 @@ fin-to-nat : ∀ {n} -> Fin n -> Nat
 fin-to-nat (fzero n) = zero
 fin-to-nat (fsuc n f) = suc (fin-to-nat f)
 
+promote : ∀ {l m n} -> Add l m n -> Fin l -> Fin n
+promote (add-suc .l m n a) (fzero l) = fzero n
+promote (add-suc .l m n a) (fsuc l f) = fsuc n (promote a f)
+
 combine-fin : ∀ {l m n} -> Add l m n -> Fin l -> Fin m -> Fin n
-combine-fin (add-suc .l m n a) (fzero l) g = fzero n
+combine-fin (add-suc .l m n a) (fzero l) g = promote (add-commute (add-suc-left a)) g
 combine-fin (add-suc .l m n a) (fsuc l f) g = fsuc n (combine-fin a f g)
 
-split-fin-fsuc : ∀ {l m} -> Fin l +' Fin m -> Fin (suc l) +' Fin m
-split-fin-fsuc (inl' x) = inl' (fsuc _ x)
-split-fin-fsuc (inr' x) = inr' x
+inl-fin-fsuc : ∀ {l m} -> Fin l +' Fin m -> Fin (suc l) +' Fin m
+inl-fin-fsuc (inl' x) = inl' (fsuc _ x)
+inl-fin-fsuc (inr' x) = inr' x
 
 split-fin : ∀ {l m n} -> Add l m n -> Fin n -> Fin l +' Fin m
 split-fin (add-zero n) f = inr' f
 split-fin (add-suc l m n a) (fzero .n) = inl' (fzero l)
-split-fin (add-suc l m n a) (fsuc .n f) = split-fin-fsuc (split-fin a f)
+split-fin (add-suc l m n a) (fsuc .n f) = inl-fin-fsuc (split-fin a f)
 
 max : ∀ {n} -> Fin (suc n)
 max {zero} = fzero zero
@@ -221,9 +221,9 @@ module EncodeExamples where
 split : ∀ l m n -> Add l m n -> Fin n -> Fin l +' Fin m
 split .0 m .m (add-zero .m) fin = inr' fin
 split .(suc l) m .(suc n) (add-suc l .m n a) (fzero .n) = inl' (fzero l)
-split .(suc l) m .(suc n) (add-suc l .m n a) (fsuc .n fin) with split l m n a fin
-split .(suc l) m .(suc n) (add-suc l .m n a) (fsuc .n fin) | inl' x = inl' (fsuc l x)
-split .(suc l) m .(suc n) (add-suc l .m n a) (fsuc .n fin) | inr' x = inr' x
+split .(suc l) m .(suc n) (add-suc l .m n a) (fsuc .n fin) = inl-fin-fsuc (split l m n a fin)
+-- split .(suc l) m .(suc n) (add-suc l .m n a) (fsuc .n fin) | inl' x = inl' (fsuc l x)
+-- split .(suc l) m .(suc n) (add-suc l .m n a) (fsuc .n fin) | inr' x = inr' x
 
 decode : (T : Type) -> (cT : Nat) -> Size T cT -> Fin cT -> Value T
 decode Empty .0 size-empty ()
