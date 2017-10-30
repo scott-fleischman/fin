@@ -16,13 +16,25 @@ data _≡_ {A : Set} (x : A) : A → Set where
   instance refl : x ≡ x
 {-# BUILTIN EQUALITY _≡_ #-}
 
-sym : ∀ {A : Set} -> {x y : A} -> x ≡ y -> y ≡ x
+sym : {A : Set} -> {x y : A} -> x ≡ y -> y ≡ x
 sym refl = refl
+
+cong : {A B : Set} -> (f : A -> B) -> {x y : A} -> x ≡ y -> f x ≡ f y
+cong f refl = refl
+
+data Singleton {A : Set} (x : A) : Set where
+  _with≡_ : (y : A) → x ≡ y → Singleton x
+
+inspect : {A : Set} (x : A) → Singleton x
+inspect x = x with≡ refl
 
 
 data _+'_ (A B : Set) : Set where
   inl' : A -> A +' B
   inr' : B -> A +' B
+
+inl'-inj : ∀ {A B} {x y : A} -> _≡_ {A +' B} (inl' x) (inl' y) -> x ≡ y
+inl'-inj refl = refl
 
 data _×'_ (A B : Set) : Set where
   pair : A -> B -> A ×' B
@@ -86,6 +98,9 @@ data Fin : Nat -> Set where
   fzero : (n : Nat)          -> Fin (suc n)
   fsuc  : (n : Nat) -> Fin n -> Fin (suc n)
 
+fsuc-inj : ∀ {n f g} -> fsuc n f ≡ fsuc n g -> f ≡ g
+fsuc-inj refl = refl
+
 fin-to-nat : ∀ {n} -> Fin n -> Nat
 fin-to-nat (fzero n) = zero
 fin-to-nat (fsuc n f) = suc (fin-to-nat f)
@@ -113,8 +128,6 @@ max {suc n} = fsuc (suc n) max
 
 min : ∀ {n} -> Fin (suc n)
 min {n} = fzero n
-
-
 
 
 
@@ -163,6 +176,12 @@ split-fin-fill-left : ∀ {l m n} v -> (a : Add l m n) -> split-fin a (fill-left
 split-fin-fill-left () (add-zero m)
 split-fin-fill-left (fzero .l) (add-suc l m n a) = refl
 split-fin-fill-left (fsuc .l v) (add-suc l m n a) rewrite split-fin-fill-left v a = refl
+
+split-fin-fill-left' : ∀ {l m n} -> (a : Add l m n) -> ∀ f g -> split-fin a f ≡ inl' g -> fill-left a g ≡ f
+split-fin-fill-left' (add-zero .(suc n)) (fzero n) g ()
+split-fin-fill-left' (add-suc l m .n a) (fzero n) g p rewrite sym (inl'-inj p) = refl
+split-fin-fill-left' (add-zero .(suc n)) (fsuc n f) g ()
+split-fin-fill-left' (add-suc l m .n a) (fsuc n f) g p = {!!}
 
 fin-to-nat-fill-left-suc : ∀ n -> (f : Fin n) -> fin-to-nat (fill-left-suc n f) ≡ fin-to-nat f
 fin-to-nat-fill-left-suc .(suc n) (fzero n) = refl
@@ -267,9 +286,13 @@ decode-encode size-unit unit = refl
 decode-encode (size+ s t x) (inl v) rewrite split-fin-fill-left (encode s v) x | decode-encode s v = refl
 decode-encode (size+ s t x) (inr v) rewrite split-fin-fill-right (encode t v) x | decode-encode t v = refl
 
+
 encode-decode : {T : Type} -> {cT : Nat} -> (s : Size T cT) -> (f : Fin cT) -> encode s (decode s f) ≡ f
 encode-decode size-unit (fzero .0) = refl
 encode-decode size-unit (fsuc .0 ())
 encode-decode (size+ s t (add-zero n)) f rewrite encode-decode t f = refl
 encode-decode (size+ s t (add-suc l m n x)) (fzero .n) rewrite encode-decode s (fzero l) = refl
-encode-decode (size+ s t (add-suc l m n x)) (fsuc .n f) = {!!}
+encode-decode (size+ s t (add-suc l m n x)) (fsuc .n f) with inspect (split-fin x f)
+encode-decode (size+ s t (add-suc l m n x)) (fsuc .n f) | inl' finL with≡ p rewrite p | encode-decode s (fsuc l finL) = cong (fsuc n) (split-fin-fill-left' x f finL p)
+encode-decode (size+ s t (add-suc l m n x)) (fsuc .n f) | inr' finM with≡ p rewrite p | encode-decode t finM = cong (fsuc n) {!!}
+
