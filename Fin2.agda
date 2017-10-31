@@ -29,13 +29,15 @@ data Fin : Nat -> Set where
 
 data Type : Set where
   Unit : Type
---  _+_ : (S T : Type) -> Type
+  _+_ : (S T : Type) -> Type
 
 data Size : Type -> Nat -> Set where
   size-unit : Size Unit 1
+  size-sum : ∀ {S T cs ct cst} -> Add cs ct cst -> Size S cs -> Size T ct -> Size (S + T) cst
 
 data Value : {T : Type} {ct : Nat} -> Size T ct -> Set where
   value-unit : Value size-unit
+
 
 encode : ∀ {T ct} (t : Size T ct) -> Value t -> Fin ct
 encode size-unit unit = fzero

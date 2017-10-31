@@ -22,6 +22,9 @@ sym refl = refl
 cong : {A B : Set} -> (f : A -> B) -> {x y : A} -> x ≡ y -> f x ≡ f y
 cong f refl = refl
 
+_=$=_ : {A B : Set} -> {f g : A -> B} -> f ≡ g -> {x y : A} -> x ≡ y -> f x ≡ g y
+refl =$= refl = refl
+
 data Singleton {A : Set} (x : A) : Set where
   _with≡_ : (y : A) → x ≡ y → Singleton x
 
@@ -55,6 +58,22 @@ add-suc-left (add-suc l m n a) = add-suc (suc l) m (suc n) (add-suc l m n a)
 add-suc-right : ∀ {l m n} -> Add l m n -> Add l (suc m) (suc n)
 add-suc-right (add-zero n) = add-zero (suc n)
 add-suc-right (add-suc l m n a) = add-suc l (suc m) (suc n) (add-suc-right a)
+
+shift-suc-left : ∀ {l m n} -> Add l (suc m) (suc n) -> Add (suc l) m (suc n)
+shift-suc-left {m = m} (add-zero .(suc _)) = add-suc zero m m (add-zero m)
+shift-suc-left (add-suc l .(suc _) zero ())
+shift-suc-left (add-suc l .(suc _) (suc n) a) = add-suc-left (shift-suc-left a)
+
+shift-suc-right : ∀ {l m n} -> Add (suc l) m (suc n) -> Add l (suc m) (suc n)
+shift-suc-right (add-suc l m n a) = add-suc-right a
+
+undo-add-suc-left : ∀ {l m n} -> Add (suc l) m (suc n) -> Add l m n
+undo-add-suc-left (add-suc l m n a) = a
+
+undo-add-suc-right : ∀ {l m n} -> Add l (suc m) (suc n) -> Add l m n
+undo-add-suc-right {m = m} (add-zero .(suc _)) = add-zero m
+undo-add-suc-right (add-suc l .(suc _) zero ())
+undo-add-suc-right (add-suc l .(suc _) (suc n) a) = shift-suc-left a
 
 add-plus : ∀ n m -> Add n m (n +N m)
 add-plus zero m = add-zero m
@@ -94,6 +113,31 @@ module AddLemmas where
   add-zero-right-eq .(suc l) .(suc n) (add-suc l .0 n a) rewrite add-zero-right-eq l n a = refl
 
 
+
+data _<=_ : (m n : Nat) -> Set where
+  zero<=n : {n : Nat} -> zero <= n
+  suc<=suc : {m n : Nat} -> m <= n -> suc m <= suc n
+
+refl<= : {n : Nat} -> n <= n
+refl<= {zero} = zero<=n
+refl<= {suc n} = suc<=suc refl<=
+
+suc-right<= : {m n : Nat} -> m <= n -> m <= suc n
+suc-right<= zero<=n = zero<=n
+suc-right<= (suc<=suc r) = suc<=suc (suc-right<= r)
+
+add-left<= : {l m n : Nat} -> Add l m n -> l <= n
+add-left<= (add-zero n) = zero<=n
+add-left<= (add-suc l m n a) = suc<=suc (add-left<= a)
+
+add-right<= : {l m n : Nat} -> Add l m n -> m <= n
+add-right<= (add-zero n) = refl<=
+add-right<= (add-suc l zero n a) = zero<=n
+add-right<= (add-suc l (suc m) zero ())
+add-right<= (add-suc l (suc m) (suc n) a) = suc-right<= (add-right<= a)
+
+
+
 data Fin : Nat -> Set where
   fzero : (n : Nat)          -> Fin (suc n)
   fsuc  : (n : Nat) -> Fin n -> Fin (suc n)
@@ -104,14 +148,6 @@ fsuc-inj refl = refl
 fin-to-nat : ∀ {n} -> Fin n -> Nat
 fin-to-nat (fzero n) = zero
 fin-to-nat (fsuc n f) = suc (fin-to-nat f)
-
-promote : ∀ {l m n} -> Add l m n -> Fin l -> Fin n
-promote (add-suc .l m n a) (fzero l) = fzero n
-promote (add-suc .l m n a) (fsuc l f) = fsuc n (promote a f)
-
-combine-fin : ∀ {l m n} -> Add l m n -> Fin l -> Fin m -> Fin n
-combine-fin (add-suc .l m n a) (fzero l) g = promote (add-commute (add-suc-left a)) g
-combine-fin (add-suc .l m n a) (fsuc l f) g = fsuc n (combine-fin a f g)
 
 inl-fin-fsuc : ∀ {l m} -> Fin l +' Fin m -> Fin (suc l) +' Fin m
 inl-fin-fsuc (inl' x) = inl' (fsuc _ x)
@@ -163,6 +199,61 @@ data Value : Type -> Set where
   inl : ∀ {S T} -> Value S -> Value (S + T)
   inr : ∀ {S T} -> Value T -> Value (S + T)
 
+data InhabitedType : Type -> Set where
+  inhabited-unit : InhabitedType Unit
+  inhabited-sum : {S T : Type} -> InhabitedType S -> InhabitedType T -> InhabitedType (S + T)
+
+data NormalType : Type -> Set where
+  normal-empty : NormalType Empty
+  normal-inhabited : {T : Type} -> InhabitedType T -> NormalType T
+
+record NormalTypeR : Set where
+  constructor normal-type
+  field
+    {type} : Type
+    normal : NormalType type
+
+data InhabitedSize : {T : Type} -> InhabitedType T -> Nat -> Set where
+  inhabited-size-unit : InhabitedSize inhabited-unit 1
+  inhabited-size-sum : {S T : Type} {cs ct cst : Nat} {IS : InhabitedType S} {IT : InhabitedType T}
+    -> (sis : InhabitedSize IS cs) -> (sit : InhabitedSize IT ct) -> Add cs ct cst -> InhabitedSize (inhabited-sum IS IT) cst
+
+data NormalSize : {T : Type} -> NormalType T -> Nat -> Set where
+  normal-size-empty : NormalSize normal-empty 0
+  normal-size-inhabited : {T : Type} {ct : Nat} {IT : InhabitedType T} -> InhabitedSize IT ct -> NormalSize (normal-inhabited IT) ct
+
+normalize-type : Type -> Type
+normalize-type Empty = Empty
+normalize-type Unit = Unit
+normalize-type (S + T) with normalize-type S | normalize-type T
+normalize-type (S + T) | Empty | T' = T'
+normalize-type (S + T) | Unit | T' = Unit + T'
+normalize-type (S + T) | S1 + S2 | Empty = S1 + S2
+normalize-type (S + T) | S1 + S2 | Unit = (S1 + S2) + Unit
+normalize-type (S + T) | S1 + S2 | T1 + T2 = (S1 + S2) + (T1 + T2)
+
+normalize-typeR : Type -> NormalTypeR
+normalize-typeR Empty = normal-type normal-empty
+normalize-typeR Unit = normal-type (normal-inhabited inhabited-unit)
+normalize-typeR (S + T) with normalize-typeR S | normalize-typeR T
+normalize-typeR (S + T) | normal-type normal-empty         | normal-type normal-empty         = normal-type normal-empty
+normalize-typeR (S + T) | normal-type normal-empty         | normal-type (normal-inhabited t) = normal-type (normal-inhabited t)
+normalize-typeR (S + T) | normal-type (normal-inhabited s) | normal-type normal-empty         = normal-type (normal-inhabited s)
+normalize-typeR (S + T) | normal-type (normal-inhabited s) | normal-type (normal-inhabited t) = normal-type (normal-inhabited (inhabited-sum s t))
+
+type-normal-size : {T : Type} {ct : Nat} -> Size T ct -> NormalSize (NormalTypeR.normal (normalize-typeR T)) ct
+type-normal-size size-empty = normal-size-empty
+type-normal-size size-unit = normal-size-inhabited inhabited-size-unit
+type-normal-size (size+ {S = S} {T = T} s t x) = {!!}
+
+inl-map : {S1 S2 T : Type} -> (f : Value S1 -> Value S2) -> Value (S1 + T) -> Value (S2 + T)
+inl-map f (inl v) = inl (f v)
+inl-map f (inr v) = inr v
+
+inr-map : {S T1 T2 : Type} -> (f : Value T1 -> Value T2) -> Value (S + T1) -> Value (S + T2)
+inr-map f (inl v) = inl v
+inr-map f (inr v) = inr (f v)
+
 fill-left-suc : ∀ n -> Fin n -> Fin (suc n)
 fill-left-suc .(suc n) (fzero n) = fzero (suc n)
 fill-left-suc .(suc n) (fsuc n f) = fsuc (suc n) (fill-left-suc n f)
@@ -172,16 +263,26 @@ fill-left (add-zero m) ()
 fill-left (add-suc l m n a) (fzero .l) = fzero n
 fill-left (add-suc l m n a) (fsuc .l f) = fsuc n (fill-left a f)
 
+
+
 split-fin-fill-left : ∀ {l m n} v -> (a : Add l m n) -> split-fin a (fill-left a v) ≡ inl' v
 split-fin-fill-left () (add-zero m)
 split-fin-fill-left (fzero .l) (add-suc l m n a) = refl
 split-fin-fill-left (fsuc .l v) (add-suc l m n a) rewrite split-fin-fill-left v a = refl
 
-split-fin-fill-left' : ∀ {l m n} -> (a : Add l m n) -> ∀ f g -> split-fin a f ≡ inl' g -> fill-left a g ≡ f
-split-fin-fill-left' (add-zero .(suc n)) (fzero n) g ()
-split-fin-fill-left' (add-suc l m .n a) (fzero n) g p rewrite sym (inl'-inj p) = refl
-split-fin-fill-left' (add-zero .(suc n)) (fsuc n f) g ()
-split-fin-fill-left' (add-suc l m .n a) (fsuc n f) g p = {!!}
+
+-- given: l + m = n
+-- if:    split-fin (Fin n) = inl' (Fin l)
+-- then:  fill-left (Fin l) = Fin n
+split-fin-fill-left' : ∀ {l m n} -> (a : Add l m n) -> (finN : Fin n) -> (finL : Fin l) -> split-fin a finN ≡ inl' finL -> fill-left a finL ≡ finN
+split-fin-fill-left' (add-zero n) f g ()
+split-fin-fill-left' (add-suc l m n a) (fzero .n) g p rewrite sym (inl'-inj p) = refl
+
+-- l + m = n
+-- if:   inl-fin-fsuc (split-fin (Fin n)) = inl' (Fin (suc l))
+-- then: fill-left (Fin (suc l)) = fsuc (Fin (suc n))
+split-fin-fill-left' (add-suc l m n a) (fsuc .n f) (fzero .l) p = {!!}
+split-fin-fill-left' (add-suc l m n a) (fsuc .n f) (fsuc .l g) p = {!!} -- with inspect (split-fin-fill-left' a f g p)
 
 fin-to-nat-fill-left-suc : ∀ n -> (f : Fin n) -> fin-to-nat (fill-left-suc n f) ≡ fin-to-nat f
 fin-to-nat-fill-left-suc .(suc n) (fzero n) = refl
@@ -258,6 +359,18 @@ decode-aux {S = S} sizeS sizeT (inl' finS) = inl (decode sizeS finS)
 decode-aux {T = T} sizeS sizeT (inr' finT) = inr (decode sizeT finT)
 
 
+decode2 : {T : Type} -> {cT : Nat} -> Size T cT -> Fin cT -> Value T
+decode2 size-empty ()
+decode2 size-unit (fzero .0) = unit
+decode2 size-unit (fsuc .0 ())
+decode2 (size+ s t (add-zero n)) f = inr (decode2 t f)
+decode2 (size+ s t (add-suc l m n x)) (fzero .n) = inl (decode2 s (fzero l))
+decode2 (size+ size-unit t (add-suc .0 .n n (add-zero .n))) (fsuc .n f) = inr (decode2 t f)
+decode2 (size+ (size+ s1 s2 (add-zero .(suc l))) t (add-suc l m n x)) (fsuc .n f) = inl-map inr (decode2 (size+ s2 t (add-suc l m n x)) (fsuc n f))
+decode2 (size+ (size+ size-unit s2 (add-suc .0 ss2 .ss xs)) t (add-suc ss m n x)) (fsuc .n f) = {!!}
+decode2 (size+ (size+ (size+ s1 s3 x₁) s2 (add-suc ss1 ss2 .ss xs)) t (add-suc ss m n x)) (fsuc .n f) = {!!}
+
+
 decode' : {T : Type} -> (s : SizedType T) -> Fin (SizedType.cardinality s) -> Value T
 decode' (sized-type cardinality size) fin = decode size fin
 
@@ -295,4 +408,3 @@ encode-decode (size+ s t (add-suc l m n x)) (fzero .n) rewrite encode-decode s (
 encode-decode (size+ s t (add-suc l m n x)) (fsuc .n f) with inspect (split-fin x f)
 encode-decode (size+ s t (add-suc l m n x)) (fsuc .n f) | inl' finL with≡ p rewrite p | encode-decode s (fsuc l finL) = cong (fsuc n) (split-fin-fill-left' x f finL p)
 encode-decode (size+ s t (add-suc l m n x)) (fsuc .n f) | inr' finM with≡ p rewrite p | encode-decode t finM = cong (fsuc n) {!!}
-
