@@ -1,5 +1,13 @@
 module Fin where
 
+data Zero : Set where
+
+elim-zero : {A : Set} -> Zero -> A
+elim-zero ()
+
+record One : Set where
+  constructor <>
+
 data Nat : Set where
   zero : Nat
   suc : Nat -> Nat
@@ -200,8 +208,8 @@ data Value : Type -> Set where
   inr : ∀ {S T} -> Value T -> Value (S + T)
 
 data InhabitedType : Type -> Set where
-  inhabited-unit : InhabitedType Unit
-  inhabited-sum : {S T : Type} -> InhabitedType S -> InhabitedType T -> InhabitedType (S + T)
+  InhabitedUnit : InhabitedType Unit
+  _+I_ : {S T : Type} -> InhabitedType S -> InhabitedType T -> InhabitedType (S + T)
 
 data NormalType : Type -> Set where
   normal-empty : NormalType Empty
@@ -214,13 +222,22 @@ record NormalTypeR : Set where
     normal : NormalType type
 
 data InhabitedSize : {T : Type} -> InhabitedType T -> Nat -> Set where
-  inhabited-size-unit : InhabitedSize inhabited-unit 1
+  inhabited-size-unit : InhabitedSize InhabitedUnit 1
   inhabited-size-sum : {S T : Type} {cs ct cst : Nat} {IS : InhabitedType S} {IT : InhabitedType T}
-    -> (sis : InhabitedSize IS cs) -> (sit : InhabitedSize IT ct) -> Add cs ct cst -> InhabitedSize (inhabited-sum IS IT) cst
+    -> (sis : InhabitedSize IS cs) -> (sit : InhabitedSize IT ct) -> Add cs ct cst -> InhabitedSize (IS +I IT) cst
+
+inhabited-size-zero : {T : Type} {IT : InhabitedType T} -> InhabitedSize IT 0 -> Zero
+inhabited-size-zero (inhabited-size-sum s t (add-zero .0)) = inhabited-size-zero s
 
 data NormalSize : {T : Type} -> NormalType T -> Nat -> Set where
   normal-size-empty : NormalSize normal-empty 0
   normal-size-inhabited : {T : Type} {ct : Nat} {IT : InhabitedType T} -> InhabitedSize IT ct -> NormalSize (normal-inhabited IT) ct
+
+
+data InhabitedValue : {T : Type} {IT : InhabitedType T} -> Value T -> Set where
+  inhabited-unit : InhabitedValue {IT = InhabitedUnit} unit
+  inhabited-inl : {S T : Type} {IS : InhabitedType S} {IT : InhabitedType T} {vs : Value S} -> InhabitedValue {IT = IS} vs -> InhabitedValue {IT = IS +I IT} (inl vs)
+  inhabited-inr : {S T : Type} {IS : InhabitedType S} {IT : InhabitedType T} {vt : Value T} -> InhabitedValue {IT = IT} vt -> InhabitedValue {IT = IS +I IT} (inr vt)
 
 normalize-type : Type -> Type
 normalize-type Empty = Empty
@@ -234,12 +251,12 @@ normalize-type (S + T) | S1 + S2 | T1 + T2 = (S1 + S2) + (T1 + T2)
 
 normalize-typeR : Type -> NormalTypeR
 normalize-typeR Empty = normal-type normal-empty
-normalize-typeR Unit = normal-type (normal-inhabited inhabited-unit)
+normalize-typeR Unit = normal-type (normal-inhabited InhabitedUnit)
 normalize-typeR (S + T) with normalize-typeR S | normalize-typeR T
 normalize-typeR (S + T) | normal-type normal-empty         | normal-type normal-empty         = normal-type normal-empty
 normalize-typeR (S + T) | normal-type normal-empty         | normal-type (normal-inhabited t) = normal-type (normal-inhabited t)
 normalize-typeR (S + T) | normal-type (normal-inhabited s) | normal-type normal-empty         = normal-type (normal-inhabited s)
-normalize-typeR (S + T) | normal-type (normal-inhabited s) | normal-type (normal-inhabited t) = normal-type (normal-inhabited (inhabited-sum s t))
+normalize-typeR (S + T) | normal-type (normal-inhabited s) | normal-type (normal-inhabited t) = normal-type (normal-inhabited (s +I t))
 
 type-normal-size : {T : Type} {ct : Nat} -> Size T ct -> NormalSize (NormalTypeR.normal (normalize-typeR T)) ct
 type-normal-size size-empty = normal-size-empty
@@ -315,6 +332,15 @@ size-left-empty T cT (size+ size-empty sizeT (add-zero .cT)) = sizeT
 size-right-empty : (T : Type) -> (cT : Nat) -> Size (T + Empty) cT -> Size T cT
 size-right-empty T .0 (size+ s size-empty (add-zero .0)) = s
 size-right-empty T .(suc n) (size+ s size-empty (add-suc l .0 n x)) rewrite AddLemmas.add-zero-right-eq l n x = s
+
+
+encodei : {T : Type} {ct : Nat} {IT : InhabitedType T} {v : Value T} -> InhabitedSize IT ct -> InhabitedValue {IT = IT} v -> Fin ct
+encodei inhabited-size-unit inhabited-unit = fzero zero
+encodei (inhabited-size-sum s t (add-zero n)) (inhabited-inl v) = elim-zero (inhabited-size-zero s) 
+encodei (inhabited-size-sum inhabited-size-unit t (add-suc .0 m n x)) (inhabited-inl v) = {!!}
+encodei (inhabited-size-sum (inhabited-size-sum s s₁ x₁) t (add-suc l m n x)) (inhabited-inl v) = {!!}
+encodei (inhabited-size-sum s t x) (inhabited-inr v) = {!!}
+
 
 encode : {T : Type} -> {cT : Nat} -> Size T cT -> Value T -> Fin cT
 encode size-unit unit = fzero zero
