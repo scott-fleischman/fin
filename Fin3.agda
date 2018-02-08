@@ -22,6 +22,12 @@ data Fin : Nat -> Set where
   fz : {n : Nat} -> Fin (suc n)
   fs : {n : Nat} -> Fin n -> Fin (suc n)
 
+record FinR : Set where
+  constructor finR
+  field
+    {size} : Nat
+    value : Fin size
+
 out-of : (n : Nat) -> Fin n -> Fin n
 out-of _ x = x
 
@@ -148,12 +154,36 @@ decode-after-encode unit = refl
 decode-after-encode (inl {T = T} s) rewrite split-fin-after-expand-fin (encode s) (size T) | decode-after-encode s = refl
 decode-after-encode (inr {S = S} t) rewrite split-fin-after-shift-fin (size S) (encode t) | decode-after-encode t = refl
 
+
+open import Agda.Primitive using (Level; _⊔_)
+record Reveal_·_is_ {a b} {A : Set a} {B : A → Set b}
+                    (f : (x : A) → B x) (x : A) (y : B x) :
+                    Set (a ⊔ b) where
+  constructor [_]
+  field eq : f x ≡ y
+
+inspect : ∀ {a b} {A : Set a} {B : A → Set b}
+          (f : (x : A) → B x) (x : A) → Reveal f · x is f x
+inspect f x = [ refl ]
+
+sym : {A : Set} -> {x y : A} -> x ≡ y -> y ≡ x
+sym refl = refl
+
+cong : {A B : Set} -> (f : A -> B) -> {x y : A} -> x ≡ y -> f x ≡ f y
+cong _ refl = refl
+
+trans : {a : Level} {A : Set a} -> {x y z : A} -> x ≡ y -> y ≡ z -> x ≡ z
+trans refl refl = refl
+
+remove-inlT : {S T : Set} -> {x y : S} -> inlT {S} {T} x ≡ inlT {S} {T} y -> x ≡ y
+remove-inlT refl = refl
+
 encode-after-decode : {T : Type} -> (f : Fin (size T)) -> encode (decode {T} f) ≡ f
 encode-after-decode {Unit} fz = refl
 encode-after-decode {Unit} (fs ())
-encode-after-decode {Sum S T} f with split-fin {size S} {size T} f
-encode-after-decode {Sum S T} f | inlT x rewrite encode-after-decode {S} x = {!!}
-encode-after-decode {Sum S T} f | inrT x rewrite encode-after-decode {T} x = {!!}
+encode-after-decode {Sum S T} f with split-fin {size S} {size T} f | inspect (split-fin {size S} {size T}) f
+encode-after-decode {Sum S T} f | inlT x | [ eq ] rewrite encode-after-decode {S} x = {!!}
+encode-after-decode {Sum S T} f | inrT x | [ eq ] rewrite encode-after-decode {T} x = {!!}
 
 module _ where
   enc1 : encode unit ≡ out-of 1 0
