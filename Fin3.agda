@@ -112,12 +112,6 @@ split-fin-after-shift-fin : (m : Nat) -> {n : Nat} -> (f : Fin n) -> split-fin {
 split-fin-after-shift-fin zero f = refl
 split-fin-after-shift-fin (suc m) f rewrite split-fin-after-shift-fin m f = refl
 
-shift-fin-inlT-left : {m n : Nat} -> (x : Fin m +T Fin n) -> (y : Fin (suc m))
-  -> shift-fin-inlT x ≡ inlT y
-  -> Sigma (Fin m) (\ z -> (y ≡ fs z) * (x ≡ inlT z))
-shift-fin-inlT-left (inlT x) .(fs x) refl = sigma x (pair refl refl)
-shift-fin-inlT-left (inrT x) y ()
-
 split-fin-left-expand-fin : {m n : Nat}
   -> (x : Fin (m +N n))
   -> (y : Fin m)
@@ -125,8 +119,9 @@ split-fin-left-expand-fin : {m n : Nat}
   -> x ≡ expand-fin y n
 split-fin-left-expand-fin {zero} x y ()
 split-fin-left-expand-fin {suc m} fz .fz refl = refl
-split-fin-left-expand-fin {suc m} (fs x) y p with shift-fin-inlT-left (split-fin x) y p
-split-fin-left-expand-fin {suc m} (fs x) y p | sigma sigma0 (pair fst snd) rewrite fst = cong fs (split-fin-left-expand-fin x sigma0 snd)
+split-fin-left-expand-fin {suc m} (fs x) y p with split-fin {m} x | inspect (split-fin {m}) x
+split-fin-left-expand-fin {suc m} (fs x) y p | inlT z | [ eq ] rewrite remove-inlT (sym p) = cong fs (split-fin-left-expand-fin x z eq)
+split-fin-left-expand-fin {suc m} (fs x) y () | inrT _ | [ eq ]
 
 split-fin-right-shift-fin : {m n : Nat}
   -> (x : Fin (m +N n))
