@@ -74,6 +74,14 @@ index-at : {n : Nat} -> Fin n -> {A : Set} -> Vec A n -> A
 index-at fz (x :: xs) = x
 index-at (fs i) (x :: xs) = index-at i xs
 
+
+index-at-expand-fin : {m : Nat} -> (i : Fin m) -> {A : Set} -> (xs : Vec A m)
+  -> {n : Nat} -> (ys : Vec A n)
+  -> index-at (expand-fin i n) (vec-append xs ys)
+  ≡ index-at i xs
+index-at-expand-fin fz     (x :: xs) ys = refl
+index-at-expand-fin (fs i) (x :: xs) ys = index-at-expand-fin i xs ys
+
 data Type : Set where
   Unit : Type
   Sum : {n : Nat} -> Vec Type n -> Type
@@ -121,6 +129,18 @@ enumerate (Sum ts) = enumerate-sum ts
 
 decode : {T : Type} -> Fin (size T) -> Value T
 decode {T} f = index-at f (enumerate T)
+
+decode-after-encode : {T : Type} -> (v : Value T) -> decode (encode v) ≡ v
+decode-after-encode unit = refl
+decode-after-encode (choose fz {Unit :: ts} unit) = refl
+decode-after-encode (choose fz {Sum ts' :: ts} (choose f val))
+  rewrite
+    index-at-expand-fin
+      (encode-choose f val)
+      (vec-map (choose fz) (enumerate-sum ts'))
+      (vec-map (add-type (Sum ts')) (enumerate-sum ts))
+  = {!!}
+decode-after-encode (choose (fs f) {t :: ts} val) = {!!}
 
 module Ex where
   3-Unit : Type
