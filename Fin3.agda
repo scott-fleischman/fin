@@ -87,6 +87,9 @@ data _+T_ (S T : Set) : Set where
 remove-inlT : {S T : Set} -> {x y : S} -> inlT {S} {T} x ≡ inlT {S} {T} y -> x ≡ y
 remove-inlT refl = refl
 
+remove-inrT : {S T : Set} -> {x y : T} -> inrT {S} {T} x ≡ inrT {S} {T} y -> x ≡ y
+remove-inrT refl = refl
+
 
 shift-fin-inlT : {m n : Nat} → Fin m +T Fin n → Fin (suc m) +T Fin n
 shift-fin-inlT (inlT x) = inlT (fs x)
@@ -118,19 +121,48 @@ split-fin-after-shift-fin : (m : Nat) -> {n : Nat} -> (f : Fin n) -> split-fin {
 split-fin-after-shift-fin zero f = refl
 split-fin-after-shift-fin (suc m) f rewrite split-fin-after-shift-fin m f = refl
 
-shift-fin-inlT-eq : {m n : Nat} -> (x : Fin m +T Fin n) -> (y : Fin (suc m))
+shift-fin-inlT-left : {m n : Nat} -> (x : Fin m +T Fin n) -> (y : Fin (suc m))
   -> shift-fin-inlT x ≡ inlT y
   -> Sigma (Fin m) (\ z -> (y ≡ fs z) * (x ≡ inlT z))
-shift-fin-inlT-eq (inlT x) .(fs x) refl = sigma x (pair refl refl)
-shift-fin-inlT-eq (inrT x) y ()
+shift-fin-inlT-left (inlT x) .(fs x) refl = sigma x (pair refl refl)
+shift-fin-inlT-left (inrT x) y ()
 
-split-fin-left-expand-fin : {m n : Nat} -> (x : Fin (m +N n)) -> (y : Fin m)
+split-fin-left-expand-fin : {m n : Nat}
+  -> (x : Fin (m +N n))
+  -> (y : Fin m)
   -> split-fin x ≡ inlT y
   -> x ≡ expand-fin y n
 split-fin-left-expand-fin {zero} x y ()
 split-fin-left-expand-fin {suc m} fz .fz refl = refl
-split-fin-left-expand-fin {suc m} (fs x) y p with shift-fin-inlT-eq (split-fin x) y p
+split-fin-left-expand-fin {suc m} (fs x) y p with shift-fin-inlT-left (split-fin x) y p
 split-fin-left-expand-fin {suc m} (fs x) y p | sigma sigma0 (pair fst snd) rewrite fst = cong fs (split-fin-left-expand-fin x sigma0 snd)
+
+shift-fin-inlT-right : {m n : Nat}
+  -> (x : Fin m +T Fin n)
+  -> (y : Fin n)
+  -> shift-fin-inlT x ≡ inrT y
+  -> x ≡ inrT y
+shift-fin-inlT-right {zero} (inlT ()) y p
+shift-fin-inlT-right {zero} (inrT x) .x refl = refl
+shift-fin-inlT-right {suc m} (inlT x) y ()
+shift-fin-inlT-right {suc m} (inrT x) .x refl = refl
+
+shift-fin-inlT-over-inrT : {m n : Nat}
+  -> (x : Fin m +T Fin n)
+  -> (y : Fin n)
+  -> shift-fin-inlT x ≡ inrT y
+  -> x ≡ inrT y
+shift-fin-inlT-over-inrT (inlT x) y ()
+shift-fin-inlT-over-inrT (inrT x) .x refl = refl
+
+split-fin-right-shift-fin : {m n : Nat}
+  -> (x : Fin (m +N n))
+  -> (y : Fin n)
+  -> split-fin {m} x ≡ inrT y
+  -> shift-fin m y ≡ x
+split-fin-right-shift-fin {zero} x y p rewrite remove-inrT p = refl
+split-fin-right-shift-fin {suc m} fz y ()
+split-fin-right-shift-fin {suc m} (fs x) y p = cong fs (split-fin-right-shift-fin x y (shift-fin-inlT-over-inrT (split-fin x) y p))
 
 module ExpectedExpandShift where
   expand3 : expand-fin (out-of 4 3) 3 ≡ (out-of 7 3)
@@ -210,7 +242,7 @@ encode-after-decode {Unit} fz = refl
 encode-after-decode {Unit} (fs ())
 encode-after-decode {Sum S T} f with split-fin {size S} {size T} f | inspect (split-fin {size S} {size T}) f
 encode-after-decode {Sum S T} f | inlT x | [ eq ] rewrite encode-after-decode {S} x | split-fin-left-expand-fin f x eq = refl
-encode-after-decode {Sum S T} f | inrT x | [ eq ] rewrite encode-after-decode {T} x = {!!}
+encode-after-decode {Sum S T} f | inrT x | [ eq ] rewrite encode-after-decode {T} x | split-fin-right-shift-fin f x eq = refl
 
 module _ where
   enc1 : encode unit ≡ out-of 1 0
