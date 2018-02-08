@@ -9,7 +9,6 @@ open import Agda.Builtin.FromNat
 
 open import Agda.Builtin.Equality
 
-
 open import Agda.Primitive using (Level; _⊔_)
 record Reveal_·_is_ {a b} {A : Set a} {B : A → Set b}
                     (f : (x : A) → B x) (x : A) (y : B x) :
@@ -30,8 +29,6 @@ cong _ refl = refl
 trans : {a : Level} {A : Set a} -> {x y z : A} -> x ≡ y -> y ≡ z -> x ≡ z
 trans refl refl = refl
 
-
-
 data False : Set where
 record True : Set where
   constructor true
@@ -44,12 +41,6 @@ instance
 data Fin : Nat -> Set where
   fz : {n : Nat} -> Fin (suc n)
   fs : {n : Nat} -> Fin n -> Fin (suc n)
-
-record FinR : Set where
-  constructor finR
-  field
-    {size} : Nat
-    value : Fin size
 
 out-of : (n : Nat) -> Fin n -> Fin n
 out-of _ x = x
@@ -137,24 +128,6 @@ split-fin-left-expand-fin {suc m} fz .fz refl = refl
 split-fin-left-expand-fin {suc m} (fs x) y p with shift-fin-inlT-left (split-fin x) y p
 split-fin-left-expand-fin {suc m} (fs x) y p | sigma sigma0 (pair fst snd) rewrite fst = cong fs (split-fin-left-expand-fin x sigma0 snd)
 
-shift-fin-inlT-right : {m n : Nat}
-  -> (x : Fin m +T Fin n)
-  -> (y : Fin n)
-  -> shift-fin-inlT x ≡ inrT y
-  -> x ≡ inrT y
-shift-fin-inlT-right {zero} (inlT ()) y p
-shift-fin-inlT-right {zero} (inrT x) .x refl = refl
-shift-fin-inlT-right {suc m} (inlT x) y ()
-shift-fin-inlT-right {suc m} (inrT x) .x refl = refl
-
-shift-fin-inlT-over-inrT : {m n : Nat}
-  -> (x : Fin m +T Fin n)
-  -> (y : Fin n)
-  -> shift-fin-inlT x ≡ inrT y
-  -> x ≡ inrT y
-shift-fin-inlT-over-inrT (inlT x) y ()
-shift-fin-inlT-over-inrT (inrT x) .x refl = refl
-
 split-fin-right-shift-fin : {m n : Nat}
   -> (x : Fin (m +N n))
   -> (y : Fin n)
@@ -162,7 +135,9 @@ split-fin-right-shift-fin : {m n : Nat}
   -> shift-fin m y ≡ x
 split-fin-right-shift-fin {zero} x y p rewrite remove-inrT p = refl
 split-fin-right-shift-fin {suc m} fz y ()
-split-fin-right-shift-fin {suc m} (fs x) y p = cong fs (split-fin-right-shift-fin x y (shift-fin-inlT-over-inrT (split-fin x) y p))
+split-fin-right-shift-fin {suc m} (fs x) y p with split-fin {m} x | inspect (split-fin {m}) x
+split-fin-right-shift-fin {suc m} (fs x) y () | inlT _ | [ eq ]
+split-fin-right-shift-fin {suc m} (fs x) y p | inrT z | [ eq ] rewrite remove-inrT (sym p) = cong fs (split-fin-right-shift-fin x z eq)
 
 module ExpectedExpandShift where
   expand3 : expand-fin (out-of 4 3) 3 ≡ (out-of 7 3)
