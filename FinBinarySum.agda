@@ -137,6 +137,7 @@ module ExpectedExpandShift where
   shift3 = refl
 
 data Type : Set where
+  Empty : Type
   Unit : Type
   Sum : (S T : Type) -> Type
 
@@ -146,6 +147,7 @@ data Value : Type -> Set where
   inr : {S T : Type} -> Value T -> Value (Sum S T)
 
 size : Type -> Nat
+size Empty = 0
 size Unit = 1
 size (Sum S T) = size S +N size T
 
@@ -162,6 +164,7 @@ finish-decode : {S T : Type}
 finish-decode (inlT x) = inl (decode x)
 finish-decode (inrT x) = inr (decode x)
 
+decode {Empty} ()
 decode {Unit} f = unit
 decode {Sum S T} f = finish-decode (split-fin {size S} {size T} f)
 
@@ -171,6 +174,7 @@ decode-after-encode (inl {T = T} s) rewrite split-fin-after-expand-fin (encode s
 decode-after-encode (inr {S = S} t) rewrite split-fin-after-shift-fin (size S) (encode t) | decode-after-encode t = refl
 
 encode-after-decode : {T : Type} -> (f : Fin (size T)) -> encode (decode {T} f) ≡ f
+encode-after-decode {Empty} ()
 encode-after-decode {Unit} fz = refl
 encode-after-decode {Unit} (fs ())
 encode-after-decode {Sum S T} f with split-fin {size S} {size T} f | inspect (split-fin {size S} {size T}) f
