@@ -10,14 +10,24 @@ open import Agda.Builtin.FromNat
 open import Agda.Builtin.Equality
 
 open import Agda.Primitive using (Level; _⊔_)
-record Reveal_·_is_ {a b} {A : Set a} {B : A → Set b}
-                    (f : (x : A) → B x) (x : A) (y : B x) :
-                    Set (a ⊔ b) where
+record Reveal
+  {a b : Level}
+  {A : Set a}
+  {B : A → Set b}
+  (f : (x : A) → B x)
+  (x : A)
+  (y : B x)
+  : Set (a ⊔ b)
+  where
   constructor [_]
   field eq : f x ≡ y
 
-inspect : ∀ {a b} {A : Set a} {B : A → Set b}
-          (f : (x : A) → B x) (x : A) → Reveal f · x is f x
+inspect : {a b : Level}
+  -> {A : Set a}
+  -> {B : A -> Set b}
+  -> (f : (x : A) -> B x)
+  -> (x : A)
+  -> Reveal f x (f x)
 inspect f x = [ refl ]
 
 sym : {A : Set} -> {x y : A} -> x ≡ y -> y ≡ x
@@ -70,34 +80,19 @@ shift-fin : (m : Nat) -> {n : Nat} -> Fin n -> Fin (m +N n)
 shift-fin zero    f = f
 shift-fin (suc m) f = fs (shift-fin m f)
 
-
 data _+T_ (S T : Set) : Set where
   inlT : S -> S +T T
   inrT : T -> S +T T
 
-remove-inlT : {S T : Set} -> {x y : S} -> inlT {S} {T} x ≡ inlT {S} {T} y -> x ≡ y
+remove-inlT : {S T : Set} -> {x y : S} -> inlT {T = T} x ≡ inlT y -> x ≡ y
 remove-inlT refl = refl
 
-remove-inrT : {S T : Set} -> {x y : T} -> inrT {S} {T} x ≡ inrT {S} {T} y -> x ≡ y
+remove-inrT : {S T : Set} -> {x y : T} -> inrT {S = S} x ≡ inrT y -> x ≡ y
 remove-inrT refl = refl
-
 
 shift-fin-inlT : {m n : Nat} → Fin m +T Fin n → Fin (suc m) +T Fin n
 shift-fin-inlT (inlT x) = inlT (fs x)
 shift-fin-inlT (inrT y) = inrT y
-
-record Sigma (A : Set) (B : A -> Set) : Set where
-  constructor sigma
-  field
-    sigma0 : A
-    sigma1 : B sigma0
-
-record _*_ (A B : Set) : Set where
-  constructor pair
-  field
-    fst : A
-    snd : B
-infixr 6 _*_
 
 split-fin : {m n : Nat} -> Fin (m +N n) -> Fin m +T Fin n
 split-fin {zero} f = inrT f
@@ -141,23 +136,6 @@ module ExpectedExpandShift where
   shift3 : shift-fin 3 (out-of 4 3) ≡ (out-of 7 6)
   shift3 = refl
 
-data Vec (A : Set) : Nat -> Set where
-  nil : Vec A 0
-  _::_ : A -> {n : Nat} -> Vec A n -> Vec A (suc n)
-infixr 5 _::_
-
-vec-map : {A B : Set} -> (A -> B) -> {n : Nat} -> Vec A n -> Vec B n
-vec-map f nil = nil
-vec-map f (x :: xs) = f x :: vec-map f xs
-
-vec-append : {A : Set} -> {m n : Nat} -> Vec A m -> Vec A n -> Vec A (m +N n)
-vec-append {m = zero} xs ys = ys
-vec-append {m = suc n} (x :: xs) ys = x :: vec-append xs ys
-
-index-at : {n : Nat} -> Fin n -> {A : Set} -> Vec A n -> A
-index-at fz (x :: xs) = x
-index-at (fs i) (x :: xs) = index-at i xs
-
 data Type : Set where
   Unit : Type
   Sum : (S T : Type) -> Type
@@ -166,12 +144,6 @@ data Value : Type -> Set where
   unit : Value Unit
   inl : {S T : Type} -> Value S -> Value (Sum S T)
   inr : {S T : Type} -> Value T -> Value (Sum S T)
-
-as-inl : (T : Type) -> {S : Type} -> Value S -> Value (Sum S T)
-as-inl _ v = inl v
-
-as-inr : (S : Type) -> {T : Type} -> Value T -> Value (Sum S T)
-as-inr _ v = inr v
 
 size : Type -> Nat
 size Unit = 1
@@ -182,22 +154,13 @@ encode unit = fz
 encode (inl {T = T} s) = expand-fin (encode s) (size T)
 encode (inr {S = S} t) = shift-fin (size S) (encode t)
 
-enumerate : (T : Type) -> Vec (Value T) (size T)
-enumerate Unit = unit :: nil
-enumerate (Sum S T) = vec-append
-  (vec-map (as-inl T) (enumerate S))
-  (vec-map (as-inr S) (enumerate T))
-
-
-decode decode'
-  : {T : Type} -> Fin (size T) -> Value T
-decode' {T} f = index-at f (enumerate T)
+decode : {T : Type} -> Fin (size T) -> Value T
 
 finish-decode : {S T : Type}
   -> Fin (size S) +T Fin (size T)
   -> Value (Sum S T)
-finish-decode {T = T} (inlT x) = as-inl T (decode x)
-finish-decode {S = S} (inrT x) = as-inr S (decode x)
+finish-decode (inlT x) = inl (decode x)
+finish-decode (inrT x) = inr (decode x)
 
 decode {Unit} f = unit
 decode {Sum S T} f = finish-decode (split-fin {size S} {size T} f)
