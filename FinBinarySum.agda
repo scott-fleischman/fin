@@ -48,6 +48,18 @@ instance
   Number.Constraint Number-Nat _ = True
   Number.fromNat    Number-Nat n = n
 
+nat-plus-zero : (n : Nat) -> n +N 0 ≡ n
+nat-plus-zero zero = refl
+nat-plus-zero (suc n) = cong suc (nat-plus-zero n)
+
+plus-suc-right : (m n : Nat) -> m +N suc n ≡ suc (m +N n)
+plus-suc-right zero _ = refl
+plus-suc-right (suc m) n = cong suc (plus-suc-right m n)
+
+nat-commutative : (m n : Nat) -> m +N n ≡ n +N m
+nat-commutative zero n rewrite nat-plus-zero n = refl
+nat-commutative (suc m) n rewrite plus-suc-right n m = cong suc (nat-commutative m n)
+
 data Fin : Nat -> Set where
   fz : {n : Nat} -> Fin (suc n)
   fs : {n : Nat} -> Fin n -> Fin (suc n)
@@ -67,10 +79,18 @@ nat-to-fin zero {suc m} {{true}} = fz
 nat-to-fin (suc n) {zero} {{()}}
 nat-to-fin (suc n) {suc m} = fs (nat-to-fin n)
 
+fin-to-nat : {n : Nat} -> Fin n -> Nat
+fin-to-nat fz = zero
+fin-to-nat (fs f) = suc (fin-to-nat f)
+
 instance
   Number-Fin : {n : Nat} → Number (Fin n)
   Number.Constraint (Number-Fin {n}) m = m <Set n
   Number.fromNat    Number-Fin       m = nat-to-fin m
+
+inc-fin-bound : {n : Nat} -> Fin n -> Fin (suc n)
+inc-fin-bound fz = fz
+inc-fin-bound (fs x) = fs (inc-fin-bound x)
 
 expand-fin : {m : Nat} -> Fin m -> (n : Nat) -> Fin (m +N n)
 expand-fin fz     n = fz
@@ -79,6 +99,24 @@ expand-fin (fs f) n = fs (expand-fin f n)
 shift-fin : (m : Nat) -> {n : Nat} -> Fin n -> Fin (m +N n)
 shift-fin zero    f = f
 shift-fin (suc m) f = fs (shift-fin m f)
+
+add-fin : {m : Nat} -> Fin m -> {n : Nat} -> Fin n -> Fin (m +N n)
+add-fin fz fz = fz
+add-fin (fz {m}) (fs {n} y) rewrite plus-suc-right m n = fs (add-fin (fz {m}) y)
+add-fin (fs x) y = fs (add-fin x y)
+
+add-fin-plus-nat : {m n : Nat} -> (x : Fin m) -> (y : Fin n)
+  -> fin-to-nat x +N fin-to-nat y ≡ fin-to-nat (add-fin x y)
+add-fin-plus-nat fz fz = refl
+add-fin-plus-nat (fz {m}) (fs {n} y) rewrite plus-suc-right m n = cong suc (add-fin-plus-nat fz y)
+add-fin-plus-nat (fs x) y = cong suc (add-fin-plus-nat x y)
+
+module ExFin where
+  f5 = out-of 10 5
+  f3 = out-of 5 3
+  fr = add-fin f5 f3
+  fr-pf : fin-to-nat f5 +N fin-to-nat f3 ≡ fin-to-nat (add-fin f5 f3)
+  fr-pf = refl
 
 data _+T_ (S T : Set) : Set where
   inlT : S -> S +T T
@@ -136,25 +174,59 @@ module ExpectedExpandShift where
   shift3 : shift-fin 3 (out-of 4 3) ≡ (out-of 7 6)
   shift3 = refl
 
-data Type : Set where
+
+data Vec (A : Set) : Nat -> Set where
+  nil : Vec A 0
+  _::_ : A -> {n : Nat} -> Vec A n -> Vec A (suc n)
+infixr 5 _::_
+
+vec-map : {A B : Set} -> (A -> B) -> {n : Nat} -> Vec A n -> Vec B n
+vec-map f nil = nil
+vec-map f (x :: xs) = f x :: vec-map f xs
+
+vec-append : {A : Set} -> {m n : Nat} -> Vec A m -> Vec A n -> Vec A (m +N n)
+vec-append {m = zero} xs ys = ys
+vec-append {m = suc n} (x :: xs) ys = x :: vec-append xs ys
+
+vec-fold : {A B : Set} -> B -> (A -> B -> B) -> {n : Nat} -> Vec A n -> B
+vec-fold b f nil = b
+vec-fold b f (x :: xs) = f x (vec-fold b f xs)
+
+index-at : {n : Nat} -> Fin n -> {A : Set} -> Vec A n -> A
+index-at fz (x :: xs) = x
+index-at (fs i) (x :: xs) = index-at i xs
+
+fold-fin : {n : Nat} -> {A : Set} -> A -> (Fin n -> A -> A) -> Fin n -> A
+fold-fin b f fz = b
+fold-fin {suc n} b f (fs x) = f (fs x) (fold-fin b (\ g -> f (inc-fin-bound g)) x)
+
+
+data Type : Set
+data Value : Type -> Set
+size : Type -> Nat
+
+data Type where
   Empty : Type
   Unit : Type
   Sum : (S T : Type) -> Type
+  Pair : (S T : Type) -> Type
 
-data Value : Type -> Set where
+data Value where
   unit : Value Unit
   inl : {S T : Type} -> Value S -> Value (Sum S T)
   inr : {S T : Type} -> Value T -> Value (Sum S T)
+  pair : {S T : Type} -> Value S -> Value T -> Value (Pair S T)
 
-size : Type -> Nat
 size Empty = 0
 size Unit = 1
 size (Sum S T) = size S +N size T
+size (Pair S T) = size S *N size T
 
 encode : {T : Type} -> Value T -> Fin (size T)
 encode unit = fz
 encode (inl {T = T} s) = expand-fin (encode s) (size T)
 encode (inr {S = S} t) = shift-fin (size S) (encode t)
+encode (pair s t) = {!!}
 
 decode : {T : Type} -> Fin (size T) -> Value T
 
@@ -167,11 +239,13 @@ finish-decode (inrT x) = inr (decode x)
 decode {Empty} ()
 decode {Unit} f = unit
 decode {Sum S T} f = finish-decode (split-fin {size S} {size T} f)
+decode {Pair S T} f = {!!}
 
 decode-after-encode : {T : Type} -> (v : Value T) -> decode (encode v) ≡ v
 decode-after-encode unit = refl
 decode-after-encode (inl {T = T} s) rewrite split-fin-after-expand-fin (encode s) (size T) | decode-after-encode s = refl
 decode-after-encode (inr {S = S} t) rewrite split-fin-after-shift-fin (size S) (encode t) | decode-after-encode t = refl
+decode-after-encode (pair s t) = {!!}
 
 encode-after-decode : {T : Type} -> (f : Fin (size T)) -> encode (decode {T} f) ≡ f
 encode-after-decode {Empty} ()
@@ -180,6 +254,7 @@ encode-after-decode {Unit} (fs ())
 encode-after-decode {Sum S T} f with split-fin {size S} {size T} f | inspect (split-fin {size S} {size T}) f
 encode-after-decode {Sum S T} f | inlT x | [ eq ] rewrite encode-after-decode {S} x | split-fin-left-expand-fin f x eq = refl
 encode-after-decode {Sum S T} f | inrT x | [ eq ] rewrite encode-after-decode {T} x | split-fin-right-shift-fin f x eq = refl
+encode-after-decode {Pair S T} f = {!!}
 
 module _ where
   enc1 : encode unit ≡ out-of 1 0
