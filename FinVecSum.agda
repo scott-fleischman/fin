@@ -50,6 +50,27 @@ shift-fin : (m : Nat) -> {n : Nat} -> Fin n -> Fin (m +N n)
 shift-fin zero    f = f
 shift-fin (suc m) f = fs (shift-fin m f)
 
+
+data _+T_ (S T : Set) : Set where
+  inlT : S -> S +T T
+  inrT : T -> S +T T
+
+remove-inlT : {S T : Set} -> {x y : S} -> inlT {T = T} x ≡ inlT y -> x ≡ y
+remove-inlT refl = refl
+
+remove-inrT : {S T : Set} -> {x y : T} -> inrT {S = S} x ≡ inrT y -> x ≡ y
+remove-inrT refl = refl
+
+
+shift-fin-inlT : {m n : Nat} → Fin m +T Fin n → Fin (suc m) +T Fin n
+shift-fin-inlT (inlT x) = inlT (fs x)
+shift-fin-inlT (inrT y) = inrT y
+
+split-fin : {m n : Nat} -> Fin (m +N n) -> Fin m +T Fin n
+split-fin {zero} f = inrT f
+split-fin {suc m} fz = inlT fz
+split-fin {suc m} (fs f) = shift-fin-inlT (split-fin f)
+
 module ExpectedExpandShift where
   expand3 : expand-fin (out-of 4 3) 3 ≡ (out-of 7 3)
   expand3 = refl
@@ -74,116 +95,33 @@ index-at : {n : Nat} -> Fin n -> {A : Set} -> Vec A n -> A
 index-at fz (x :: xs) = x
 index-at (fs i) (x :: xs) = index-at i xs
 
-
-index-at-expand-fin : {m : Nat} -> (i : Fin m) -> {A : Set} -> (xs : Vec A m)
-  -> {n : Nat} -> (ys : Vec A n)
-  -> index-at (expand-fin i n) (vec-append xs ys)
-  ≡ index-at i xs
-index-at-expand-fin fz     (x :: xs) ys = refl
-index-at-expand-fin (fs i) (x :: xs) ys = index-at-expand-fin i xs ys
+vec-foldr : {A B : Set} (b : B) (f : A -> B -> B) {n : Nat} (v : Vec A n) -> B
+vec-foldr b f nil = b
+vec-foldr b f (x :: xs) = f x (vec-foldr b f xs)
 
 data Type : Set where
   Unit : Type
-  Sum : {n : Nat} -> Vec Type n -> Type
+  Sum : {n : Nat} (Ts : Vec Type n) -> Type
 
 data Value : Type -> Set where
   unit : Value Unit
-  choose : {n : Nat} -> (f : Fin n) -> {v : Vec Type n} -> Value (index-at f v) -> Value (Sum v)
+  choose : {n : Nat} (i : Fin n) (Ts : Vec Type n) (T : Type) (p : T ≡ index-at i Ts) (v : Value T) -> Value (Sum Ts)
 
-size : Type -> Nat
-size-vec : {n : Nat} -> Vec Type n -> Nat
+cardinality : Type -> Nat
+cardinality Unit = 1
+cardinality (Sum nil) = 0
+cardinality (Sum (T :: Ts)) = cardinality T +N cardinality (Sum Ts)
 
-size Unit = 1
-size (Sum ts) = size-vec ts
+encode : {T : Type} (v : Value T) -> Fin (cardinality T)
+encode unit = fz
+encode (choose fz (T :: Ts) .T refl v) = expand-fin (encode v) (cardinality (Sum Ts)) 
+encode (choose (fs i) (T :: Ts) T' p v) = shift-fin (cardinality T) (encode (choose i Ts T' p v))
 
-size-vec nil = 0
-size-vec (x :: xs) = size x +N size-vec xs
-
-add-type : (t : Type) -> {n : Nat} -> {ts : Vec Type n} -> Value (Sum ts) -> Value (Sum (t :: ts))
-add-type t (choose f v) = choose (fs f) v
-
-promote-to-sum : {n : Nat} -> (ts : Vec Type n) -> {t : Type} -> Value t -> Value (Sum (t :: ts))
-promote-to-sum _ v = choose fz v
-
-encode : {T : Type} -> Value T -> Fin (size T)
-
-encode-choose : {n : Nat} -> (f : Fin n) -> {v : Vec Type n} -> Value (index-at f v) -> Fin (size-vec v)
-encode-choose ()     {nil}     val
-encode-choose fz     {t :: ts} val = expand-fin (encode val) (size-vec ts)
-encode-choose (fs f) {t :: ts} val = shift-fin (size t) (encode-choose f {ts} val) 
-
-encode unit = 0
-encode (choose f v) = encode-choose f v
-
-enumerate : (T : Type) -> Vec (Value T) (size T)
-
-enumerate-sum : {n : Nat} -> (ts : Vec Type n) -> Vec (Value (Sum ts)) (size-vec ts)
-enumerate-sum nil = nil
-enumerate-sum (t :: ts) =
-  vec-append
-    (vec-map (promote-to-sum ts) (enumerate t))
-    (vec-map (add-type t) (enumerate-sum ts))
-
-enumerate Unit = unit :: nil
-enumerate (Sum ts) = enumerate-sum ts
-
-decode : {T : Type} -> Fin (size T) -> Value T
-decode {T} f = index-at f (enumerate T)
-
-decode-after-encode : {T : Type} -> (v : Value T) -> decode (encode v) ≡ v
-decode-after-encode unit = refl
-decode-after-encode (choose fz {Unit :: ts} unit) = refl
-decode-after-encode (choose fz {Sum ts' :: ts} (choose f val))
-  rewrite
-    index-at-expand-fin
-      (encode-choose f val)
-      (vec-map (choose fz) (enumerate-sum ts'))
-      (vec-map (add-type (Sum ts')) (enumerate-sum ts))
-  = {!!}
-decode-after-encode (choose (fs f) {t :: ts} val) = {!!}
-
-module Ex where
-  3-Unit : Type
-  3-Unit = Sum (Unit :: Unit :: Unit :: nil)
-
-  sum : Value 3-Unit
-  sum = choose 0 unit
-
-  sum2 : Value 3-Unit
-  sum2 = choose 1 unit
-  
-  Nested : Type
-  Nested = Sum
-    (  Unit
-    :: Sum
-      (  Unit
-      :: Unit
-      :: Sum
-        (  Unit
-        :: Unit :: nil) :: nil)
-    :: Unit :: nil)
-
-  nested1 : Value Nested
-  nested1 = choose 1 (choose 2 (choose 1 unit))
-
-  nested-size : size Nested ≡ 6
-  nested-size = refl
-
-  encode1 : encode sum ≡ 0
-  encode1 = refl
-
-  encode2 : encode sum2 ≡ 1
-  encode2 = refl
-
-  encode-n1 : encode nested1 ≡ 4
-  encode-n1 = refl
-
-  decode1 : decode (out-of 3 0) ≡ sum
-  decode1 = refl
-
-  decode2 : decode (out-of 3 1) ≡ sum2
-  decode2 = refl
-
-  decode-n1 : decode (out-of 6 4) ≡ nested1
-  decode-n1 = refl
-
+decode : {T : Type} -> Fin (cardinality T) -> Value T
+decode {Unit} fz = unit
+decode {Unit} (fs ())
+decode {Sum nil} ()
+decode {Sum (T :: Ts)} f with split-fin {cardinality T} {cardinality (Sum Ts)} f
+decode {Sum (T :: Ts)} f | inlT f' = choose fz (T :: Ts) T refl (decode {T} f')
+decode {Sum (T :: Ts)} f | inrT f' with decode {Sum Ts} f'
+decode {Sum (T :: Ts)} f | inrT f' | choose i .Ts T' p v = choose (fs i) (T :: Ts) T' p v 
