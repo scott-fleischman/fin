@@ -114,9 +114,9 @@ add-fin-plus-nat (fs x) y = cong suc (add-fin-plus-nat x y)
 module ExFin where
   f5 = out-of 10 5
   f3 = out-of 5 3
-  fr = add-fin f5 f3
-  fr-pf : fin-to-nat f5 +N fin-to-nat f3 ≡ fin-to-nat (add-fin f5 f3)
-  fr-pf = refl
+  _ : fin-to-nat f5 +N fin-to-nat f3 ≡ fin-to-nat (add-fin f5 f3)
+  _ = refl
+
 
 data _+T_ (S T : Set) : Set where
   inlT : S -> S +T T
@@ -168,11 +168,11 @@ split-fin-right-shift-fin {suc m} (fs x) y () | inlT _ | [ eq ]
 split-fin-right-shift-fin {suc m} (fs x) y p | inrT z | [ eq ] rewrite remove-inrT (sym p) = cong fs (split-fin-right-shift-fin x z eq)
 
 module ExpectedExpandShift where
-  expand3 : expand-fin (out-of 4 3) 3 ≡ (out-of 7 3)
-  expand3 = refl
+  _ : expand-fin (out-of 4 3) 3 ≡ out-of 7 3
+  _ = refl
 
-  shift3 : shift-fin 3 (out-of 4 3) ≡ (out-of 7 6)
-  shift3 = refl
+  _ : shift-fin 3 (out-of 4 3) ≡ out-of 7 6
+  _ = refl
 
 
 data Vec (A : Set) : Nat -> Set where
@@ -209,24 +209,20 @@ data Type where
   Empty : Type
   Unit : Type
   Sum : (S T : Type) -> Type
-  Pair : (S T : Type) -> Type
 
 data Value where
   unit : Value Unit
   inl : {S T : Type} -> Value S -> Value (Sum S T)
   inr : {S T : Type} -> Value T -> Value (Sum S T)
-  pair : {S T : Type} -> Value S -> Value T -> Value (Pair S T)
 
 size Empty = 0
 size Unit = 1
 size (Sum S T) = size S +N size T
-size (Pair S T) = size S *N size T
 
 encode : {T : Type} -> Value T -> Fin (size T)
 encode unit = fz
 encode (inl {T = T} s) = expand-fin (encode s) (size T)
 encode (inr {S = S} t) = shift-fin (size S) (encode t)
-encode (pair s t) = {!!}
 
 decode : {T : Type} -> Fin (size T) -> Value T
 
@@ -239,13 +235,11 @@ finish-decode (inrT x) = inr (decode x)
 decode {Empty} ()
 decode {Unit} f = unit
 decode {Sum S T} f = finish-decode (split-fin {size S} {size T} f)
-decode {Pair S T} f = {!!}
 
 decode-after-encode : {T : Type} -> (v : Value T) -> decode (encode v) ≡ v
 decode-after-encode unit = refl
 decode-after-encode (inl {T = T} s) rewrite split-fin-after-expand-fin (encode s) (size T) | decode-after-encode s = refl
 decode-after-encode (inr {S = S} t) rewrite split-fin-after-shift-fin (size S) (encode t) | decode-after-encode t = refl
-decode-after-encode (pair s t) = {!!}
 
 encode-after-decode : {T : Type} -> (f : Fin (size T)) -> encode (decode {T} f) ≡ f
 encode-after-decode {Empty} ()
@@ -254,24 +248,23 @@ encode-after-decode {Unit} (fs ())
 encode-after-decode {Sum S T} f with split-fin {size S} {size T} f | inspect (split-fin {size S} {size T}) f
 encode-after-decode {Sum S T} f | inlT x | [ eq ] rewrite encode-after-decode {S} x | split-fin-left-expand-fin f x eq = refl
 encode-after-decode {Sum S T} f | inrT x | [ eq ] rewrite encode-after-decode {T} x | split-fin-right-shift-fin f x eq = refl
-encode-after-decode {Pair S T} f = {!!}
 
 module _ where
-  enc1 : encode unit ≡ out-of 1 0
-  enc1 = refl
+  _ : encode unit ≡ out-of 1 0
+  _ = refl
 
   sumv0 sumv2 : Value (Sum Unit (Sum Unit Unit))
   sumv0 = inl unit
   sumv2 = inr (inr unit)
 
-  enc-sv0 : encode sumv0 ≡ out-of 3 0
-  enc-sv0 = refl
+  _ : encode sumv0 ≡ out-of 3 0
+  _ = refl
 
-  enc-sv2 : encode sumv2 ≡ out-of 3 2
-  enc-sv2 = refl
+  _ : encode sumv2 ≡ out-of 3 2
+  _ = refl
  
-  dec-sv0 : decode (out-of 3 0) ≡ sumv0
-  dec-sv0 = refl
+  _ : decode (out-of 3 0) ≡ sumv0
+  _ = refl
 
-  dec-sv2 : decode (out-of 3 2) ≡ sumv2
-  dec-sv2 = refl
+  _ : decode (out-of 3 2) ≡ sumv2
+  _ = refl
