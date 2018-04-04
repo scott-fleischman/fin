@@ -9,6 +9,27 @@ open import Agda.Builtin.FromNat
 
 open import Agda.Builtin.Equality
 
+open import Agda.Primitive using (Level; _⊔_)
+record Reveal
+  {a b : Level}
+  {A : Set a}
+  {B : A → Set b}
+  (f : (x : A) → B x)
+  (x : A)
+  (y : B x)
+  : Set (a ⊔ b)
+  where
+  constructor [_]
+  field eq : f x ≡ y
+
+inspect : {a b : Level}
+  -> {A : Set a}
+  -> {B : A -> Set b}
+  -> (f : (x : A) -> B x)
+  -> (x : A)
+  -> Reveal f x (f x)
+inspect f x = [ refl ]
+
 data False : Set where
 record True : Set where
   constructor true
@@ -125,3 +146,21 @@ decode {Sum (T :: Ts)} f with split-fin {cardinality T} {cardinality (Sum Ts)} f
 decode {Sum (T :: Ts)} f | inlT f' = choose fz (T :: Ts) T refl (decode {T} f')
 decode {Sum (T :: Ts)} f | inrT f' with decode {Sum Ts} f'
 decode {Sum (T :: Ts)} f | inrT f' | choose i .Ts T' p v = choose (fs i) (T :: Ts) T' p v 
+
+encode-decode-id : {T : Type} (f : Fin (cardinality T)) -> encode {T} (decode f) ≡ f
+encode-decode-id {Unit} fz = refl
+encode-decode-id {Unit} (fs ())
+encode-decode-id {Sum nil} ()
+encode-decode-id {Sum (T :: Ts)} f with split-fin {cardinality T} {cardinality (Sum Ts)} f | inspect (split-fin {cardinality T} {cardinality (Sum Ts)}) f
+encode-decode-id {Sum (T :: Ts)} f | inlT f' | [ eq ] rewrite encode-decode-id {T} f' = {!!}
+encode-decode-id {Sum (T :: Ts)} f | inrT f' | eq with decode {Sum Ts} f'
+encode-decode-id {Sum (T :: Ts)} f | inrT f' | eq | choose i .Ts T' p r = {!!}
+
+decode-encode-id : {T : Type} (v : Value T) -> decode (encode v) ≡ v
+decode-encode-id unit = refl
+decode-encode-id (choose () nil T p v)
+decode-encode-id (choose i (T :: Ts) T' p v)
+  with split-fin {cardinality T} {cardinality (Sum Ts)} (encode (choose i (T :: Ts) T' p v))
+  | inspect (split-fin {cardinality T} {cardinality (Sum Ts)}) (encode (choose i (T :: Ts) T' p v))
+decode-encode-id (choose i (T :: Ts) T' p v) | inlT x | [ eq ] = {!!}
+decode-encode-id (choose i (T :: Ts) T' p v) | inrT x | [ eq ] = {!!}
