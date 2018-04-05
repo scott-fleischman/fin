@@ -252,3 +252,73 @@ A ⇒ B = Product (vec-replicate (cardinality A) B)
 
 Π : (A : Type) (M : Vec Type (cardinality A)) → Type
 Π A M = Product M
+
+module _ where
+  N0 : Type
+  N0 = Sum nil
+
+  _ : cardinality N0 ≡ 0
+  _ = refl
+
+  N0' : Type
+  N0' = Sum (N0 :: nil)
+
+  _ : cardinality N0' ≡ 0
+  _ = refl
+
+
+  N1 : Type
+  N1 = Unit
+
+  _ : cardinality N1 ≡ 1
+  _ = refl
+
+  N1' : Type
+  N1' = Sum (Unit :: nil)
+
+  _ : cardinality N1' ≡ 1
+  _ = refl
+
+
+  N2 : Type
+  N2 = Sum (N1 :: N1 :: nil)
+
+  _ : cardinality N2 ≡ 1 +N 1
+  _ = refl
+
+
+  N3 : Type
+  N3 = Sum (N2 :: N1 :: nil)
+
+  _ : cardinality N3 ≡ 2 +N 1
+  _ = refl
+
+
+  N4 : Type
+  N4 = Sum (N2 :: N2 :: nil)
+
+  _ : cardinality N4 ≡ 2 +N 2
+  _ = refl
+
+
+  _ : cardinality (Pair N2 N3) ≡ 2 *N 3
+  _ = refl
+
+  _ : cardinality (N2 ⇒ N3) ≡ 9
+  _ = refl
+
+
+  vec432 : _
+  vec432 = N4 :: N3 :: N2 :: nil
+
+  _ : cardinality (Sum vec432) ≡ 4 +N 3 +N 2
+  _ = refl
+
+  _ : cardinality (Product vec432) ≡ 4 *N 3 *N 2
+  _ = refl
+
+  _ : cardinality (Σ N3 vec432) ≡ cardinality (Sum vec432)
+  _ = refl
+
+  _ : cardinality (Π N3 vec432) ≡ cardinality (Product vec432)
+  _ = refl
