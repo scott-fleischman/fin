@@ -26,6 +26,9 @@ cong _ refl = refl
 trans : {A : Set} -> {x y z : A} -> x ≡ y -> y ≡ z -> x ≡ z
 trans refl refl = refl
 
+subst : {A : Set} {x y : A} (p : x ≡ y) {P : A → Set} (Px : P x) → P y
+subst refl Px = Px
+
 data False : Set where
 record True : Set where
   constructor true
@@ -78,6 +81,8 @@ remove-inlT refl = refl
 remove-inrT : {S T : Set} -> {x y : T} -> inrT {S = S} x ≡ inrT y -> x ≡ y
 remove-inrT refl = refl
 
+inl≢inr : {T : Set} {A B : Set} {a : A} {b : B} (p : inlT a ≡ inrT b) → T
+inl≢inr ()
 
 shift-fin-inlT : {m n : Nat} → Fin m +T Fin n → Fin (suc m) +T Fin n
 shift-fin-inlT (inlT x) = inlT (fs x)
@@ -139,6 +144,10 @@ vec-append : {A : Set} -> {m n : Nat} -> Vec A m -> Vec A n -> Vec A (m +N n)
 vec-append {m = zero} xs ys = ys
 vec-append {m = suc n} (x :: xs) ys = x :: vec-append xs ys
 
+vec-replicate : {A : Set} (a : A) (n : Nat) → Vec A n
+vec-replicate a zero = nil
+vec-replicate a (suc n) = a :: vec-replicate a n
+
 index-at : {n : Nat} -> Fin n -> {A : Set} -> Vec A n -> A
 index-at fz (x :: xs) = x
 index-at (fs i) (x :: xs) = index-at i xs
@@ -155,6 +164,10 @@ data Type : Set where
 data Value : Type -> Set where
   unit : Value Unit
   choose : {n : Nat} (T : Type) {Ts : Vec Type n} (i : T ∈ Ts) (v : Value T) -> Value (Sum Ts)
+
+choose-in-s : {n : Nat} {T T' T″ : Type} {Ts : Vec Type n} {i : T ∈ Ts} {i' : T' ∈ Ts} {v : Value T} {v' : Value T'} (p : choose T i v ≡ choose T' i' v')
+  → choose T (in-s T″ i) v ≡ choose T' (in-s T″ i') v'
+choose-in-s refl = refl
 
 cardinality : Type -> Nat
 cardinality Unit = 1
@@ -182,13 +195,39 @@ encode-decode-id {Sum nil} ()
 encode-decode-id {Sum (T :: Ts)} f with split-fin (cardinality T) f | inspect (split-fin (cardinality T)) f
 encode-decode-id {Sum (T :: Ts)} f | inlT f' | inspected eq rewrite encode-decode-id {T} f' | split-fin-left-expand-fin f f' eq = refl
 encode-decode-id {Sum (T :: Ts)} f | inrT f' | inspected eq with decode {Sum Ts} f' | inspect (decode {Sum Ts}) f'
-encode-decode-id {Sum (T :: Ts)} f | inrT f' | inspected eq | choose T₁ i r | inspected eq' rewrite sym eq' | encode-decode-id {Sum Ts} f' | split-fin-right-shift-fin f f' eq = refl
+encode-decode-id {Sum (T :: Ts)} f | inrT f' | inspected eq | choose T' i r | inspected eq' rewrite sym eq' | encode-decode-id {Sum Ts} f' | split-fin-right-shift-fin f f' eq = refl
 
--- decode-encode-id : {T : Type} (v : Value T) -> decode (encode v) ≡ v
--- decode-encode-id unit = refl
--- decode-encode-id (choose () nil T p v)
--- decode-encode-id (choose i (T :: Ts) T' p v)
---   with split-fin {cardinality T} {cardinality (Sum Ts)} (encode (choose i (T :: Ts) T' p v))
---   | inspect (split-fin {cardinality T} {cardinality (Sum Ts)}) (encode (choose i (T :: Ts) T' p v))
--- decode-encode-id (choose i (T :: Ts) T' p v) | inlT x | inspected eq = {!!}
--- decode-encode-id (choose i (T :: Ts) T' p v) | inrT x | inspected eq = {!!}
+decode-encode-id : {T : Type} (v : Value T) -> decode (encode v) ≡ v
+decode-encode-id unit = refl
+decode-encode-id (choose T (in-z {v = Ts}) v)
+  with       split-fin (cardinality T)  (expand-fin (encode v) (cardinality (Sum Ts)))
+  | inspect (split-fin (cardinality T)) (expand-fin (encode v) (cardinality (Sum Ts)))
+decode-encode-id (choose T (in-z {v = Ts}) v) | inlT f' | inspected eq rewrite split-fin-after-expand-fin (encode v) (cardinality (Sum Ts)) | sym (remove-inlT eq) | decode-encode-id v = refl
+decode-encode-id (choose T (in-z {v = Ts}) v) | inrT f' | inspected eq with decode {Sum Ts} f' | inspect (decode {Sum Ts}) f'
+decode-encode-id (choose T (in-z {v = Ts}) v) | inrT f' | inspected eq | choose T' i v' | inspected eq' rewrite split-fin-after-expand-fin (encode v) (cardinality (Sum Ts)) = inl≢inr eq
+decode-encode-id (choose T (in-s T' i) v)
+  with       split-fin (cardinality T')  (shift-fin (cardinality T') (encode (choose T i v)))
+  | inspect (split-fin (cardinality T')) (shift-fin (cardinality T') (encode (choose T i v)))
+decode-encode-id (choose T (in-s T' i) v) | inlT f' | inspected eq rewrite split-fin-after-shift-fin (cardinality T') (encode (choose T i v)) = inl≢inr (sym eq)
+decode-encode-id (choose T (in-s T' {v = Ts} i) v) | inrT f' | inspected eq with decode {Sum Ts} f' | inspect (decode {Sum Ts}) f'
+decode-encode-id (choose T (in-s T' {v = Ts} i) v) | inrT f' | inspected eq | choose T″ j r2 | inspected eq' rewrite split-fin-after-shift-fin (cardinality T') (encode (choose T i v)) | sym (remove-inrT eq) | decode-encode-id (choose T i v) = choose-in-s (sym eq')
+
+module _ where
+  _ : encode unit ≡ out-of 1 0
+  _ = refl
+
+  sumv0 sumv2 : Value (Sum (Unit :: Sum (Unit :: Unit :: nil) :: nil))
+  sumv0 = choose _ in-z unit
+  sumv2 = choose _ (in-s _ in-z) (choose _ (in-s _ in-z) unit)
+
+  _ : encode sumv0 ≡ out-of 3 0
+  _ = refl
+
+  _ : encode sumv2 ≡ out-of 3 2
+  _ = refl
+ 
+  _ : decode (out-of 3 0) ≡ sumv0
+  _ = refl
+
+  _ : decode (out-of 3 2) ≡ sumv2
+  _ = refl
