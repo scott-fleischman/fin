@@ -144,9 +144,9 @@ vec-append : {A : Set} -> {m n : Nat} -> Vec A m -> Vec A n -> Vec A (m +N n)
 vec-append {m = zero} xs ys = ys
 vec-append {m = suc n} (x :: xs) ys = x :: vec-append xs ys
 
-vec-replicate : {A : Set} (a : A) (n : Nat) → Vec A n
-vec-replicate a zero = nil
-vec-replicate a (suc n) = a :: vec-replicate a n
+vec-replicate : {A : Set} (n : Nat) (a : A) → Vec A n
+vec-replicate zero a = nil
+vec-replicate (suc n) a = a :: vec-replicate n a
 
 index-at : {n : Nat} -> Fin n -> {A : Set} -> Vec A n -> A
 index-at fz (x :: xs) = x
@@ -173,6 +173,7 @@ cardinality : Type -> Nat
 cardinality Unit = 1
 cardinality (Sum nil) = 0
 cardinality (Sum (T :: Ts)) = cardinality T +N cardinality (Sum Ts)
+
 
 encode : {T : Type} (v : Value T) -> Fin (cardinality T)
 encode unit = fz
@@ -231,3 +232,23 @@ module _ where
 
   _ : decode (out-of 3 2) ≡ sumv2
   _ = refl
+
+
+
+-- Products, Functions, Σ, Π can be represented as sums
+
+Pair : (A B : Type) → Type
+Pair A B = Sum (vec-replicate (cardinality A) B)
+
+Product : {n : Nat} (v : Vec Type n) → Type
+Product nil = Unit
+Product (T :: Ts) = Pair T (Product Ts)
+
+_⇒_ : (A B : Type) → Type
+A ⇒ B = Product (vec-replicate (cardinality A) B)
+
+Σ : (A : Type) (M : Vec Type (cardinality A)) → Type
+Σ A M = Sum M
+
+Π : (A : Type) (M : Vec Type (cardinality A)) → Type
+Π A M = Product M
