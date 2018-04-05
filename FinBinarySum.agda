@@ -9,24 +9,11 @@ open import Agda.Builtin.FromNat
 
 open import Agda.Builtin.Equality
 
-open import Agda.Primitive using (Level; _⊔_)
-record Reveal
-  {a b : Level}
-  {A : Set a}
-  {B : A → Set b}
-  (f : (x : A) → B x)
-  (x : A)
-  (y : B x)
-  : Set (a ⊔ b)
-  where
+record Reveal {A : Set} {B : A → Set} (f : (x : A) → B x) (x : A) (y : B x) : Set where
   constructor [_]
   field eq : f x ≡ y
 
-inspect : {a b : Level}
-  -> {A : Set a}
-  -> {B : A -> Set b}
-  -> (f : (x : A) -> B x)
-  -> (x : A)
+inspect : {A : Set} {B : A -> Set} (f : (x : A) -> B x) (x : A)
   -> Reveal f x (f x)
 inspect f x = [ refl ]
 
@@ -36,7 +23,7 @@ sym refl = refl
 cong : {A B : Set} -> (f : A -> B) -> {x y : A} -> x ≡ y -> f x ≡ f y
 cong _ refl = refl
 
-trans : {a : Level} {A : Set a} -> {x y z : A} -> x ≡ y -> y ≡ z -> x ≡ z
+trans : {A : Set} -> {x y z : A} -> x ≡ y -> y ≡ z -> x ≡ z
 trans refl refl = refl
 
 data False : Set where

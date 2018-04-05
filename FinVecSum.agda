@@ -9,26 +9,22 @@ open import Agda.Builtin.FromNat
 
 open import Agda.Builtin.Equality
 
-open import Agda.Primitive using (Level; _⊔_)
-record Reveal
-  {a b : Level}
-  {A : Set a}
-  {B : A → Set b}
-  (f : (x : A) → B x)
-  (x : A)
-  (y : B x)
-  : Set (a ⊔ b)
-  where
-  constructor [_]
+record Inspect {A : Set} {B : A → Set} (f : (x : A) → B x) (x : A) (y : B x) : Set where
+  constructor inspected
   field eq : f x ≡ y
 
-inspect : {a b : Level}
-  -> {A : Set a}
-  -> {B : A -> Set b}
-  -> (f : (x : A) -> B x)
-  -> (x : A)
-  -> Reveal f x (f x)
-inspect f x = [ refl ]
+inspect : {A : Set} {B : A -> Set} (f : (x : A) -> B x) (x : A)
+  -> Inspect f x (f x)
+inspect f x = inspected refl
+
+sym : {A : Set} -> {x y : A} -> x ≡ y -> y ≡ x
+sym refl = refl
+
+cong : {A B : Set} -> (f : A -> B) -> {x y : A} -> x ≡ y -> f x ≡ f y
+cong _ refl = refl
+
+trans : {A : Set} -> {x y z : A} -> x ≡ y -> y ≡ z -> x ≡ z
+trans refl refl = refl
 
 data False : Set where
 record True : Set where
@@ -87,10 +83,41 @@ shift-fin-inlT : {m n : Nat} → Fin m +T Fin n → Fin (suc m) +T Fin n
 shift-fin-inlT (inlT x) = inlT (fs x)
 shift-fin-inlT (inrT y) = inrT y
 
-split-fin : {m n : Nat} -> Fin (m +N n) -> Fin m +T Fin n
-split-fin {zero} f = inrT f
-split-fin {suc m} fz = inlT fz
-split-fin {suc m} (fs f) = shift-fin-inlT (split-fin f)
+split-fin : (m : Nat) {n : Nat} (f : Fin (m +N n)) → Fin m +T Fin n
+split-fin zero f = inrT f
+split-fin (suc m) fz = inlT fz
+split-fin (suc m) (fs f) = shift-fin-inlT (split-fin m f)
+
+split-fin-after-expand-fin : {m : Nat} -> (f : Fin m) -> (n : Nat) -> split-fin m (expand-fin f n) ≡ inlT f
+split-fin-after-expand-fin fz n = refl
+split-fin-after-expand-fin (fs f) n rewrite split-fin-after-expand-fin f n = refl
+
+split-fin-after-shift-fin : (m : Nat) -> {n : Nat} -> (f : Fin n) -> split-fin m (shift-fin m f) ≡ inrT f
+split-fin-after-shift-fin zero f = refl
+split-fin-after-shift-fin (suc m) f rewrite split-fin-after-shift-fin m f = refl
+
+split-fin-left-expand-fin : {m n : Nat}
+  -> (x : Fin (m +N n))
+  -> (y : Fin m)
+  -> split-fin m x ≡ inlT y
+  -> x ≡ expand-fin y n
+split-fin-left-expand-fin {zero} x y ()
+split-fin-left-expand-fin {suc m} fz .fz refl = refl
+split-fin-left-expand-fin {suc m} (fs x) y p with split-fin m x | inspect (split-fin m) x
+split-fin-left-expand-fin {suc m} (fs x) y p | inlT z | inspected eq rewrite remove-inlT (sym p) = cong fs (split-fin-left-expand-fin x z eq)
+split-fin-left-expand-fin {suc m} (fs x) y () | inrT _ | inspected eq
+
+split-fin-right-shift-fin : {m n : Nat}
+  -> (x : Fin (m +N n))
+  -> (y : Fin n)
+  -> split-fin m x ≡ inrT y
+  -> shift-fin m y ≡ x
+split-fin-right-shift-fin {zero} x y p rewrite remove-inrT p = refl
+split-fin-right-shift-fin {suc m} fz y ()
+split-fin-right-shift-fin {suc m} (fs x) y p with split-fin m x | inspect (split-fin m) x
+split-fin-right-shift-fin {suc m} (fs x) y () | inlT _ | inspected eq
+split-fin-right-shift-fin {suc m} (fs x) y p | inrT z | inspected eq rewrite remove-inrT (sym p) = cong fs (split-fin-right-shift-fin x z eq)
+
 
 module ExpectedExpandShift where
   expand3 : expand-fin (out-of 4 3) 3 ≡ (out-of 7 3)
@@ -116,9 +143,10 @@ index-at : {n : Nat} -> Fin n -> {A : Set} -> Vec A n -> A
 index-at fz (x :: xs) = x
 index-at (fs i) (x :: xs) = index-at i xs
 
-vec-foldr : {A B : Set} (b : B) (f : A -> B -> B) {n : Nat} (v : Vec A n) -> B
-vec-foldr b f nil = b
-vec-foldr b f (x :: xs) = f x (vec-foldr b f xs)
+data _∈_ {A : Set} (a : A) : {n : Nat} (v : Vec A n) → Set where
+  in-z : {n : Nat} {v : Vec A n} → a ∈ a :: v
+  in-s : {n : Nat} (b : A) {v : Vec A n} (i : a ∈ v) → a ∈ b :: v
+infix 3 _∈_
 
 data Type : Set where
   Unit : Type
@@ -126,7 +154,7 @@ data Type : Set where
 
 data Value : Type -> Set where
   unit : Value Unit
-  choose : {n : Nat} (i : Fin n) (Ts : Vec Type n) (T : Type) (p : T ≡ index-at i Ts) (v : Value T) -> Value (Sum Ts)
+  choose : {n : Nat} (T : Type) {Ts : Vec Type n} (i : T ∈ Ts) (v : Value T) -> Value (Sum Ts)
 
 cardinality : Type -> Nat
 cardinality Unit = 1
@@ -135,32 +163,32 @@ cardinality (Sum (T :: Ts)) = cardinality T +N cardinality (Sum Ts)
 
 encode : {T : Type} (v : Value T) -> Fin (cardinality T)
 encode unit = fz
-encode (choose fz (T :: Ts) .T refl v) = expand-fin (encode v) (cardinality (Sum Ts)) 
-encode (choose (fs i) (T :: Ts) T' p v) = shift-fin (cardinality T) (encode (choose i Ts T' p v))
+encode (choose T in-z v) = expand-fin (encode v) _
+encode (choose T (in-s T' i) v) = shift-fin (cardinality T') (encode (choose T i v))
 
 decode : {T : Type} -> Fin (cardinality T) -> Value T
 decode {Unit} fz = unit
 decode {Unit} (fs ())
 decode {Sum nil} ()
-decode {Sum (T :: Ts)} f with split-fin {cardinality T} {cardinality (Sum Ts)} f
-decode {Sum (T :: Ts)} f | inlT f' = choose fz (T :: Ts) T refl (decode {T} f')
+decode {Sum (T :: Ts)} f with split-fin (cardinality T) f
+decode {Sum (T :: Ts)} f | inlT f' = choose T in-z (decode f')
 decode {Sum (T :: Ts)} f | inrT f' with decode {Sum Ts} f'
-decode {Sum (T :: Ts)} f | inrT f' | choose i .Ts T' p v = choose (fs i) (T :: Ts) T' p v 
+decode {Sum (T :: Ts)} f | inrT f' | choose T' i v = choose T' (in-s T i) v
 
-encode-decode-id : {T : Type} (f : Fin (cardinality T)) -> encode {T} (decode f) ≡ f
+encode-decode-id : {T : Type} (f : Fin (cardinality T)) → encode {T} (decode f) ≡ f
 encode-decode-id {Unit} fz = refl
 encode-decode-id {Unit} (fs ())
 encode-decode-id {Sum nil} ()
-encode-decode-id {Sum (T :: Ts)} f with split-fin {cardinality T} {cardinality (Sum Ts)} f | inspect (split-fin {cardinality T} {cardinality (Sum Ts)}) f
-encode-decode-id {Sum (T :: Ts)} f | inlT f' | [ eq ] rewrite encode-decode-id {T} f' = {!!}
-encode-decode-id {Sum (T :: Ts)} f | inrT f' | eq with decode {Sum Ts} f'
-encode-decode-id {Sum (T :: Ts)} f | inrT f' | eq | choose i .Ts T' p r = {!!}
+encode-decode-id {Sum (T :: Ts)} f with split-fin (cardinality T) f | inspect (split-fin (cardinality T)) f
+encode-decode-id {Sum (T :: Ts)} f | inlT f' | inspected eq rewrite encode-decode-id {T} f' | split-fin-left-expand-fin f f' eq = refl
+encode-decode-id {Sum (T :: Ts)} f | inrT f' | inspected eq with decode {Sum Ts} f' | inspect (decode {Sum Ts}) f'
+encode-decode-id {Sum (T :: Ts)} f | inrT f' | inspected eq | choose T₁ i r | inspected eq' rewrite sym eq' | encode-decode-id {Sum Ts} f' | split-fin-right-shift-fin f f' eq = refl
 
-decode-encode-id : {T : Type} (v : Value T) -> decode (encode v) ≡ v
-decode-encode-id unit = refl
-decode-encode-id (choose () nil T p v)
-decode-encode-id (choose i (T :: Ts) T' p v)
-  with split-fin {cardinality T} {cardinality (Sum Ts)} (encode (choose i (T :: Ts) T' p v))
-  | inspect (split-fin {cardinality T} {cardinality (Sum Ts)}) (encode (choose i (T :: Ts) T' p v))
-decode-encode-id (choose i (T :: Ts) T' p v) | inlT x | [ eq ] = {!!}
-decode-encode-id (choose i (T :: Ts) T' p v) | inrT x | [ eq ] = {!!}
+-- decode-encode-id : {T : Type} (v : Value T) -> decode (encode v) ≡ v
+-- decode-encode-id unit = refl
+-- decode-encode-id (choose () nil T p v)
+-- decode-encode-id (choose i (T :: Ts) T' p v)
+--   with split-fin {cardinality T} {cardinality (Sum Ts)} (encode (choose i (T :: Ts) T' p v))
+--   | inspect (split-fin {cardinality T} {cardinality (Sum Ts)}) (encode (choose i (T :: Ts) T' p v))
+-- decode-encode-id (choose i (T :: Ts) T' p v) | inlT x | inspected eq = {!!}
+-- decode-encode-id (choose i (T :: Ts) T' p v) | inrT x | inspected eq = {!!}
