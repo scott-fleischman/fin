@@ -33,10 +33,27 @@ data False : Set where
 record True : Set where
   constructor true
 
+
+record Σ (A : Set) (B : A → Set) : Set where
+  constructor _,_
+  field
+    fst : A
+    snd : B fst
+
+record _×_ (A B : Set) : Set where
+  constructor _,_
+  field
+    fst : A
+    snd : B
+
 instance
   Number-Nat : Number Nat
   Number.Constraint Number-Nat _ = True
   Number.fromNat    Number-Nat n = n
+
+_^N_ : (x y : Nat) → Nat
+x ^N zero = 1
+x ^N suc y = x *N (x ^N y)
 
 data Fin : Nat -> Set where
   fz : {n : Nat} -> Fin (suc n)
@@ -157,6 +174,28 @@ data _∈_ {A : Set} (a : A) : {n : Nat} (v : Vec A n) → Set where
   in-s : {n : Nat} (b : A) {v : Vec A n} (i : a ∈ v) → a ∈ b :: v
 infix 3 _∈_
 
+fin-to-∈ : {n : Nat} (f : Fin n) {A : Set} (v : Vec A n) → Σ A (_∈ v)
+fin-to-∈ fz (x :: v) = x , in-z
+fin-to-∈ (fs f) (x :: v) with fin-to-∈ f v
+fin-to-∈ (fs f) (x :: v) | x' , v' = x' , in-s x v'
+
+∈-to-fin : {A : Set} {a : A} {n : Nat} {v : Vec A n} (i : a ∈ v) → Fin n
+∈-to-fin in-z = fz
+∈-to-fin (in-s b i) = fs (∈-to-fin i)
+
+fin-∈-replicate : {n : Nat} (f : Fin n) {A : Set} {a : A} → a ∈ vec-replicate n a
+fin-∈-replicate fz = in-z
+fin-∈-replicate (fs f) = in-s _ (fin-∈-replicate f)
+
+∈-replicate-eq : {A : Set} {n : Nat} {a b : A} (i : b ∈ vec-replicate n a) → b ≡ a
+∈-replicate-eq in-z = refl
+∈-replicate-eq (in-s b i) = ∈-replicate-eq i
+
+data All {A : Set} (B : A → Set) : {n : Nat} (vs : Vec A n) → Set where
+  nil : All B nil
+  cons : (a : A) (b : B a) {n : Nat} {vs : Vec A n} (all : All B vs) → All B (a :: vs)
+
+
 data Type : Set where
   Unit : Type
   Sum : {n : Nat} (Ts : Vec Type n) -> Type
@@ -240,18 +279,33 @@ module _ where
 Pair : (A B : Type) → Type
 Pair A B = Sum (vec-replicate (cardinality A) B)
 
+pair : {A B : Type} → Value A → Value B → Value (Pair A B)
+pair a b = choose _ (fin-∈-replicate (encode a)) b
+
+pair-fst : {A B : Type} → Value (Pair A B) → Value A
+pair-fst (choose T i p) = decode (∈-to-fin i)
+
+pair-snd : {A B : Type} → Value (Pair A B) → Value B
+pair-snd (choose T i v) = subst (∈-replicate-eq i) v
+
+
 Product : {n : Nat} (v : Vec Type n) → Type
 Product nil = Unit
 Product (T :: Ts) = Pair T (Product Ts)
 
+product : {n : Nat} {Ts : Vec Type n} (vs : All Value Ts) → Value (Product Ts)
+product nil = unit
+product (cons a b vs) = pair b (product vs)
+
+
 _⇒_ : (A B : Type) → Type
 A ⇒ B = Product (vec-replicate (cardinality A) B)
 
-Σ : (A : Type) (M : Vec Type (cardinality A)) → Type
-Σ A M = Sum M
+Sigma : (A : Type) (M : Vec Type (cardinality A)) → Type
+Sigma A M = Sum M
 
-Π : (A : Type) (M : Vec Type (cardinality A)) → Type
-Π A M = Product M
+Pi : (A : Type) (M : Vec Type (cardinality A)) → Type
+Pi A M = Product M
 
 module _ where
   N0 : Type
@@ -283,7 +337,59 @@ module _ where
   N2 : Type
   N2 = Sum (N1 :: N1 :: nil)
 
+  Bit = N2
+
   _ : cardinality N2 ≡ 1 +N 1
+  _ = refl
+
+  bit0 : Value Bit
+  bit0 = choose Unit in-z unit
+
+  bit1 : Value Bit
+  bit1 = choose Unit (in-s Unit in-z) unit
+
+
+  -- int of 2 bits (2 ^ 2 = 4 possible values) [cf. int32 = int of 32 bits = 2 ^ 32 possible values]
+  Int2 : Type
+  Int2 = Product (Bit :: Bit :: nil)
+
+  int2-00 : Value Int2
+  int2-00 = pair bit0 bit0
+
+  _ : encode int2-00 ≡ 0
+  _ = refl
+
+  _ : decode 0 ≡ int2-00
+  _ = refl
+
+
+  int2-01 : Value Int2
+  int2-01 = pair bit0 bit1
+
+  _ : encode int2-01 ≡ 1
+  _ = refl
+
+  _ : decode 1 ≡ int2-01
+  _ = refl
+
+
+  int2-10 : Value Int2
+  int2-10 = pair bit1 bit0
+
+  _ : encode int2-10 ≡ 2
+  _ = refl
+
+  _ : decode 2 ≡ int2-10
+  _ = refl
+
+
+  int2-11 : Value Int2
+  int2-11 = pair bit1 bit1
+
+  _ : encode int2-11 ≡ 3
+  _ = refl
+
+  _ : decode 3 ≡ int2-11
   _ = refl
 
 
@@ -304,7 +410,7 @@ module _ where
   _ : cardinality (Pair N2 N3) ≡ 2 *N 3
   _ = refl
 
-  _ : cardinality (N2 ⇒ N3) ≡ 9
+  _ : cardinality (N2 ⇒ N3) ≡ 3 ^N 2
   _ = refl
 
 
@@ -317,8 +423,8 @@ module _ where
   _ : cardinality (Product vec432) ≡ 4 *N 3 *N 2
   _ = refl
 
-  _ : cardinality (Σ N3 vec432) ≡ cardinality (Sum vec432)
+  _ : cardinality (Sigma N3 vec432) ≡ cardinality (Sum vec432)
   _ = refl
 
-  _ : cardinality (Π N3 vec432) ≡ cardinality (Product vec432)
+  _ : cardinality (Pi N3 vec432) ≡ cardinality (Product vec432)
   _ = refl
