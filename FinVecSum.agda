@@ -174,10 +174,9 @@ data _∈_ {A : Set} (a : A) : {n : Nat} (v : Vec A n) → Set where
   in-s : {n : Nat} (b : A) {v : Vec A n} (i : a ∈ v) → a ∈ b :: v
 infix 3 _∈_
 
-fin-to-∈ : {n : Nat} (f : Fin n) {A : Set} (v : Vec A n) → Σ A (_∈ v)
-fin-to-∈ fz (x :: v) = x , in-z
-fin-to-∈ (fs f) (x :: v) with fin-to-∈ f v
-fin-to-∈ (fs f) (x :: v) | x' , v' = x' , in-s x v'
+fin-to-∈ : {n : Nat} (f : Fin n) {A : Set} (v : Vec A n) → index-at f v ∈ v
+fin-to-∈ fz (x :: v) = in-z
+fin-to-∈ (fs f) (x :: v) = in-s x (fin-to-∈ f v)
 
 ∈-to-fin : {A : Set} {a : A} {n : Nat} {v : Vec A n} (i : a ∈ v) → Fin n
 ∈-to-fin in-z = fz
@@ -301,11 +300,23 @@ product (cons a b vs) = pair b (product vs)
 _⇒_ : (A B : Type) → Type
 A ⇒ B = Product (vec-replicate (cardinality A) B)
 
+function : {A B : Type} (vs : All Value (vec-replicate (cardinality A) B)) → Value (A ⇒ B)
+function v = product v
+
+
 Sigma : (A : Type) (M : Vec Type (cardinality A)) → Type
 Sigma A M = Sum M
 
+sigma : {A : Type} {M : Vec Type (cardinality A)} (a : Value A) (b : Value (index-at (encode a) M)) → Value (Sigma A M)
+sigma {M = M} a b = choose _ (fin-to-∈ (encode a) M) b
+
+
 Pi : (A : Type) (M : Vec Type (cardinality A)) → Type
 Pi A M = Product M
+
+pi : {A : Type} {M : Vec Type (cardinality A)} (vs : All Value M) → Value (Pi A M)
+pi v = product v
+
 
 module _ where
   N0 : Type
