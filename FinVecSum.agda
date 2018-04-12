@@ -1,3 +1,5 @@
+--{-# OPTIONS --show-implicit #-}
+
 module _ where
 
 open import Agda.Builtin.Nat
@@ -169,6 +171,10 @@ index-at : {n : Nat} -> Fin n -> {A : Set} -> Vec A n -> A
 index-at fz (x :: xs) = x
 index-at (fs i) (x :: xs) = index-at i xs
 
+index-at-replicate : {n : Nat} (i : Fin n) {A : Set} (a : A) → index-at i (vec-replicate n a) ≡ a
+index-at-replicate fz _ = refl
+index-at-replicate (fs i) _ = index-at-replicate i _
+
 data _∈_ {A : Set} (a : A) : {n : Nat} (v : Vec A n) → Set where
   in-z : {n : Nat} {v : Vec A n} → a ∈ a :: v
   in-s : {n : Nat} (b : A) {v : Vec A n} (i : a ∈ v) → a ∈ b :: v
@@ -182,6 +188,10 @@ fin-to-∈ (fs f) (x :: v) = in-s x (fin-to-∈ f v)
 ∈-to-fin in-z = fz
 ∈-to-fin (in-s b i) = fs (∈-to-fin i)
 
+index-at-∈-to-fin : {n : Nat} {A : Set} {a : A} {v : Vec A n} (i : a ∈ v) → index-at (∈-to-fin i) v ≡ a
+index-at-∈-to-fin in-z = refl
+index-at-∈-to-fin (in-s b i) = index-at-∈-to-fin i
+
 fin-∈-replicate : {n : Nat} (f : Fin n) {A : Set} {a : A} → a ∈ vec-replicate n a
 fin-∈-replicate fz = in-z
 fin-∈-replicate (fs f) = in-s _ (fin-∈-replicate f)
@@ -193,6 +203,10 @@ fin-∈-replicate (fs f) = in-s _ (fin-∈-replicate f)
 data All {A : Set} (B : A → Set) : {n : Nat} (vs : Vec A n) → Set where
   nil : All B nil
   cons : (a : A) (b : B a) {n : Nat} {vs : Vec A n} (all : All B vs) → All B (a :: vs)
+
+index-at-all : {A : Set} {n : Nat} {vs : Vec A n} {B : A → Set} (i : Fin n) (a : All B vs) → B (index-at i vs)
+index-at-all (fz) (cons a b vs) = b
+index-at-all (fs i) (cons a b vs) = index-at-all i vs
 
 
 data Type : Set where
@@ -296,6 +310,10 @@ product : {n : Nat} {Ts : Vec Type n} (vs : All Value Ts) → Value (Product Ts)
 product nil = unit
 product (cons a b vs) = pair b (product vs)
 
+product-nth : {n : Nat} {Ts : Vec Type n} (i : Fin n) (v : Value (Product Ts)) → Value (index-at i Ts)
+product-nth {Ts = nil} () v
+product-nth {Ts = T :: Ts} fz (choose T' i' v) = decode (∈-to-fin i')
+product-nth {Ts = T :: Ts} (fs i) (choose T' i' v) = product-nth i (subst (∈-replicate-eq i') v)
 
 _⇒_ : (A B : Type) → Type
 A ⇒ B = Product (vec-replicate (cardinality A) B)
@@ -304,11 +322,21 @@ function : {A B : Type} (vs : All Value (vec-replicate (cardinality A) B)) → V
 function v = product v
 
 
+function-app : {A B : Type} (f : Value (A ⇒ B)) (a : Value A) → Value B
+function-app {A} {B} f a = subst (index-at-replicate (encode a) B) {P = Value} (product-nth (encode a) f)
+
+
 Sigma : (A : Type) (M : Vec Type (cardinality A)) → Type
 Sigma A M = Sum M
 
 sigma : {A : Type} {M : Vec Type (cardinality A)} (a : Value A) (b : Value (index-at (encode a) M)) → Value (Sigma A M)
 sigma {M = M} a b = choose _ (fin-to-∈ (encode a) M) b
+
+sigma-fst : {A : Type} {M : Vec Type (cardinality A)} (v : Value (Sigma A M)) → Value A
+sigma-fst (choose T i v) = decode (∈-to-fin i)
+
+sigma-snd : {A : Type} {M : Vec Type (cardinality A)} (v : Value (Sigma A M)) → Value (index-at (encode {A} (sigma-fst v)) M)
+sigma-snd {A} {M} (choose T i v) rewrite encode-decode-id {A} (∈-to-fin i) | index-at-∈-to-fin i = v
 
 
 Pi : (A : Type) (M : Vec Type (cardinality A)) → Type
@@ -316,6 +344,10 @@ Pi A M = Product M
 
 pi : {A : Type} {M : Vec Type (cardinality A)} (vs : All Value M) → Value (Pi A M)
 pi v = product v
+
+
+pi-app : {A : Type} {M : Vec Type (cardinality A)} (f : Value (Pi A M)) (a : Value A) → Value (index-at (encode a) M)
+pi-app f a = product-nth (encode a) f
 
 
 module _ where
