@@ -383,27 +383,17 @@ module _ where
   nat-comm (suc m) n rewrite nat+suc-suc n m | nat-comm m n = refl
 
   sum+0 : (A : Type) → cardinality A ≡ cardinality (Sum (A :: N0 :: nil))
-  sum+0 Unit = refl
-  sum+0 (Sum nil) = refl
-  sum+0 (Sum (T :: Ts)) rewrite nat+0 (cardinality T +N cardinality (Sum Ts)) = refl
+  sum+0 A = sym (nat+0 (cardinality A))
 
   0+sum : (A : Type) → cardinality A ≡ cardinality (Sum (N0 :: A :: nil))
-  0+sum A rewrite nat+0 (cardinality A) = refl
+  0+sum A = sym (nat+0 (cardinality A))
 
   sum-comm : (A B : Type) → cardinality (Sum (A :: B :: nil)) ≡ cardinality (Sum (B :: A :: nil))
-  sum-comm Unit B rewrite nat+0 (cardinality B) | nat+1-suc (cardinality B) = refl
-  sum-comm (Sum Ts) Unit rewrite nat+0 (cardinality (Sum Ts)) | nat+1-suc (cardinality (Sum Ts)) = refl
-  sum-comm (Sum nil) (Sum Ts) rewrite nat+0 (cardinality (Sum Ts)) = refl
-  sum-comm (Sum (S :: Ss)) (Sum nil) rewrite nat+0 (cardinality S +N cardinality (Sum Ss)) = refl
-  sum-comm (Sum (S :: Ss)) (Sum (T :: Ts))
-    rewrite
-      nat+0 (cardinality S +N cardinality (Sum Ss))
-    | nat+0 (cardinality T +N cardinality (Sum Ts))
-    | nat-comm
-        (cardinality S +N cardinality (Sum Ss))
-        (cardinality T +N cardinality (Sum Ts))
-    = refl
-
+  sum-comm A B rewrite nat+0 (cardinality A) | nat+0 (cardinality B) | nat-comm (cardinality A) (cardinality B) = refl
+  
+  cardinality-replicate-unit : (t : Nat) → cardinality (Sum (vec-replicate t Unit)) ≡ t
+  cardinality-replicate-unit zero = refl
+  cardinality-replicate-unit (suc t) = cong suc (cardinality-replicate-unit t)
 
   N1 : Type
   N1 = Unit
@@ -420,11 +410,10 @@ module _ where
 
   pair×1 : (A : Type) → cardinality A ≡ cardinality (Pair A N1)
   pair×1 Unit = refl
-  pair×1 (Sum nil) = refl
-  pair×1 (Sum (T :: Ts)) = {!!}
+  pair×1 (Sum Ts) = sym (cardinality-replicate-unit (cardinality (Sum Ts)))
 
   1×pair : (A : Type) → cardinality A ≡ cardinality (Pair N1 A)
-  1×pair A rewrite nat+0 (cardinality A) = refl
+  1×pair A = sym (nat+0 (cardinality A))
 
 
   N2 : Type
