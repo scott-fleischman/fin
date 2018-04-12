@@ -365,6 +365,46 @@ module _ where
   _ = refl
 
 
+  nat+0 : (n : Nat) → n +N 0 ≡ n
+  nat+0 zero = refl
+  nat+0 (suc n) = cong suc (nat+0 n)
+
+  nat+1-suc : (n : Nat) → n +N 1 ≡ suc n
+  nat+1-suc zero = refl
+  nat+1-suc (suc n) = cong suc (nat+1-suc n)
+
+  nat+suc-suc : (m n : Nat) → m +N suc n ≡ suc (m +N n)
+  nat+suc-suc zero n = refl
+  nat+suc-suc (suc m) zero rewrite nat+0 m | nat+1-suc m = refl
+  nat+suc-suc (suc m) (suc n) rewrite nat+suc-suc m (suc n) = refl
+
+  nat-comm : (m n : Nat) → m +N n ≡ n +N m
+  nat-comm zero n = sym (nat+0 n)
+  nat-comm (suc m) n rewrite nat+suc-suc n m | nat-comm m n = refl
+
+  sum+0 : (A : Type) → cardinality A ≡ cardinality (Sum (A :: N0 :: nil))
+  sum+0 Unit = refl
+  sum+0 (Sum nil) = refl
+  sum+0 (Sum (T :: Ts)) rewrite nat+0 (cardinality T +N cardinality (Sum Ts)) = refl
+
+  0+sum : (A : Type) → cardinality A ≡ cardinality (Sum (N0 :: A :: nil))
+  0+sum A rewrite nat+0 (cardinality A) = refl
+
+  sum-comm : (A B : Type) → cardinality (Sum (A :: B :: nil)) ≡ cardinality (Sum (B :: A :: nil))
+  sum-comm Unit B rewrite nat+0 (cardinality B) | nat+1-suc (cardinality B) = refl
+  sum-comm (Sum Ts) Unit rewrite nat+0 (cardinality (Sum Ts)) | nat+1-suc (cardinality (Sum Ts)) = refl
+  sum-comm (Sum nil) (Sum Ts) rewrite nat+0 (cardinality (Sum Ts)) = refl
+  sum-comm (Sum (S :: Ss)) (Sum nil) rewrite nat+0 (cardinality S +N cardinality (Sum Ss)) = refl
+  sum-comm (Sum (S :: Ss)) (Sum (T :: Ts))
+    rewrite
+      nat+0 (cardinality S +N cardinality (Sum Ss))
+    | nat+0 (cardinality T +N cardinality (Sum Ts))
+    | nat-comm
+        (cardinality S +N cardinality (Sum Ss))
+        (cardinality T +N cardinality (Sum Ts))
+    = refl
+
+
   N1 : Type
   N1 = Unit
 
@@ -376,6 +416,15 @@ module _ where
 
   _ : cardinality N1' ≡ 1
   _ = refl
+
+
+  pair×1 : (A : Type) → cardinality A ≡ cardinality (Pair A N1)
+  pair×1 Unit = refl
+  pair×1 (Sum nil) = refl
+  pair×1 (Sum (T :: Ts)) = {!!}
+
+  1×pair : (A : Type) → cardinality A ≡ cardinality (Pair N1 A)
+  1×pair A rewrite nat+0 (cardinality A) = refl
 
 
   N2 : Type
