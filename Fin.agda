@@ -2,6 +2,8 @@
 
 module _ where
 
+infixr 5 _::_
+
 open import Agda.Builtin.Nat
   using (Nat; zero; suc)
   renaming (_+_ to _+N_)
@@ -153,7 +155,6 @@ module ExpectedExpandShift where
 data Vec (A : Set) : Nat -> Set where
   nil : Vec A 0
   _::_ : A -> {n : Nat} -> Vec A n -> Vec A (suc n)
-infixr 5 _::_
 
 vec-map : {A B : Set} -> (A -> B) -> {n : Nat} -> Vec A n -> Vec B n
 vec-map f nil = nil
@@ -202,11 +203,11 @@ fin-∈-replicate (fs f) = in-s _ (fin-∈-replicate f)
 
 data All {A : Set} (B : A → Set) : {n : Nat} (vs : Vec A n) → Set where
   nil : All B nil
-  cons : (a : A) (b : B a) {n : Nat} {vs : Vec A n} (all : All B vs) → All B (a :: vs)
+  _::_ : {a : A} (b : B a) {n : Nat} {vs : Vec A n} (all : All B vs) → All B (a :: vs)
 
 index-at-all : {A : Set} {n : Nat} {vs : Vec A n} {B : A → Set} (i : Fin n) (a : All B vs) → B (index-at i vs)
-index-at-all (fz) (cons a b vs) = b
-index-at-all (fs i) (cons a b vs) = index-at-all i vs
+index-at-all (fz) (b :: vs) = b
+index-at-all (fs i) (b :: vs) = index-at-all i vs
 
 
 data Type : Set where
@@ -308,7 +309,7 @@ Product (T :: Ts) = Pair T (Product Ts)
 
 product : {n : Nat} {Ts : Vec Type n} (vs : All Value Ts) → Value (Product Ts)
 product nil = unit
-product (cons a b vs) = pair b (product vs)
+product (b :: vs) = pair b (product vs)
 
 product-nth : {n : Nat} {Ts : Vec Type n} (i : Fin n) (v : Value (Product Ts)) → Value (index-at i Ts)
 product-nth {Ts = nil} () v
@@ -380,10 +381,47 @@ module _ where
   N2 : Type
   N2 = Sum (N1 :: N1 :: nil)
 
-  Bit = N2
-
   _ : cardinality N2 ≡ 1 +N 1
   _ = refl
+
+
+  N3 : Type
+  N3 = Sum (N2 :: N1 :: nil)
+
+  _ : cardinality N3 ≡ 2 +N 1
+  _ = refl
+
+
+  N4 : Type
+  N4 = Sum (N2 :: N2 :: nil)
+
+  _ : cardinality N4 ≡ 2 +N 2
+  _ = refl
+
+
+  _ : cardinality (Pair N2 N3) ≡ 2 *N 3
+  _ = refl
+
+  _ : cardinality (N2 ⇒ N3) ≡ 3 ^N 2
+  _ = refl
+
+
+  vec432 : Vec Type _
+  vec432 = N4 :: N3 :: N2 :: nil
+
+  _ : cardinality (Sum vec432) ≡ 4 +N 3 +N 2
+  _ = refl
+
+  _ : cardinality (Product vec432) ≡ 4 *N 3 *N 2
+  _ = refl
+
+  _ : cardinality (Sigma N3 vec432) ≡ cardinality (Sum vec432)
+  _ = refl
+
+  _ : cardinality (Pi N3 vec432) ≡ cardinality (Product vec432)
+  _ = refl
+
+  Bit = N2
 
   bit0 : Value Bit
   bit0 = choose Unit in-z unit
@@ -436,38 +474,26 @@ module _ where
   _ = refl
 
 
-  N3 : Type
-  N3 = Sum (N2 :: N1 :: nil)
-
-  _ : cardinality N3 ≡ 2 +N 1
+  _ : cardinality (Int2 ⇒ Int2) ≡ 256 -- 4 ^N 4
   _ = refl
 
 
-  N4 : Type
-  N4 = Sum (N2 :: N2 :: nil)
+  id2 : Value (Int2 ⇒ Int2)
+  id2 = function {Int2} {Int2}
+    (int2-00 :: int2-01 :: int2-10 :: int2-11 :: nil)
 
-  _ : cardinality N4 ≡ 2 +N 2
+  _ : encode {Int2} (function-app id2 int2-00) ≡ 0
   _ = refl
 
+  inc2 : Value (Int2 ⇒ Int2)
+  inc2 = function {Int2} {Int2}
+    (int2-01 :: int2-10 :: int2-11 :: int2-00 :: nil)
 
-  _ : cardinality (Pair N2 N3) ≡ 2 *N 3
+  _ : encode {Int2} (function-app inc2 int2-00) ≡ 1
   _ = refl
 
-  _ : cardinality (N2 ⇒ N3) ≡ 3 ^N 2
+  _ : encode {Int2} (function-app {Int2} inc2 (function-app inc2 int2-00)) ≡ 2
   _ = refl
 
-
-  vec432 : _
-  vec432 = N4 :: N3 :: N2 :: nil
-
-  _ : cardinality (Sum vec432) ≡ 4 +N 3 +N 2
-  _ = refl
-
-  _ : cardinality (Product vec432) ≡ 4 *N 3 *N 2
-  _ = refl
-
-  _ : cardinality (Sigma N3 vec432) ≡ cardinality (Sum vec432)
-  _ = refl
-
-  _ : cardinality (Pi N3 vec432) ≡ cardinality (Product vec432)
+  _ : function-app {Int2} inc2 (function-app inc2 int2-00) ≡ int2-10
   _ = refl
