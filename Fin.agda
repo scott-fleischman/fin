@@ -116,11 +116,11 @@ split-fin (suc m) (fs f) = shift-fin-inlT (split-fin m f)
 
 split-fin-after-expand-fin : {m : Nat} -> (f : Fin m) -> (n : Nat) -> split-fin m (expand-fin f n) ≡ inlT f
 split-fin-after-expand-fin fz n = refl
-split-fin-after-expand-fin (fs f) n rewrite split-fin-after-expand-fin f n = refl
+split-fin-after-expand-fin (fs f) n = cong shift-fin-inlT (split-fin-after-expand-fin f n)
 
 split-fin-after-shift-fin : (m : Nat) -> {n : Nat} -> (f : Fin n) -> split-fin m (shift-fin m f) ≡ inrT f
 split-fin-after-shift-fin zero f = refl
-split-fin-after-shift-fin (suc m) f rewrite split-fin-after-shift-fin m f = refl
+split-fin-after-shift-fin (suc m) f = cong shift-fin-inlT (split-fin-after-shift-fin m f)
 
 split-fin-left-expand-fin : {m n : Nat}
   -> (x : Fin (m +N n))
@@ -130,7 +130,10 @@ split-fin-left-expand-fin : {m n : Nat}
 split-fin-left-expand-fin {zero} x y ()
 split-fin-left-expand-fin {suc m} fz .fz refl = refl
 split-fin-left-expand-fin {suc m} (fs x) y p with split-fin m x | inspect (split-fin m) x
-split-fin-left-expand-fin {suc m} (fs x) y p | inlT z | inspected eq rewrite remove-inlT (sym p) = cong fs (split-fin-left-expand-fin x z eq)
+split-fin-left-expand-fin {suc m} {n} (fs x) y p | inlT z | inspected eq =
+  trans
+    (cong fs (split-fin-left-expand-fin x z eq))
+    (sym (cong (λ a → expand-fin a n) (remove-inlT (sym p))))
 split-fin-left-expand-fin {suc m} (fs x) y () | inrT _ | inspected eq
 
 split-fin-right-shift-fin : {m n : Nat}
@@ -138,11 +141,15 @@ split-fin-right-shift-fin : {m n : Nat}
   -> (y : Fin n)
   -> split-fin m x ≡ inrT y
   -> shift-fin m y ≡ x
-split-fin-right-shift-fin {zero} x y p rewrite remove-inrT p = refl
+split-fin-right-shift-fin {zero} x y p = sym (remove-inrT p)
 split-fin-right-shift-fin {suc m} fz y ()
 split-fin-right-shift-fin {suc m} (fs x) y p with split-fin m x | inspect (split-fin m) x
 split-fin-right-shift-fin {suc m} (fs x) y () | inlT _ | inspected eq
-split-fin-right-shift-fin {suc m} (fs x) y p | inrT z | inspected eq rewrite remove-inrT (sym p) = cong fs (split-fin-right-shift-fin x z eq)
+split-fin-right-shift-fin {suc m} (fs x) y p | inrT z | inspected eq =
+  cong fs
+    (trans
+      (cong (shift-fin m) (remove-inrT (sym p)))
+      (split-fin-right-shift-fin x z eq))
 
 
 module ExpectedExpandShift where
@@ -247,24 +254,52 @@ encode-decode-id {Unit} fz = refl
 encode-decode-id {Unit} (fs ())
 encode-decode-id {Sum nil} ()
 encode-decode-id {Sum (T :: Ts)} f with split-fin (cardinality T) f | inspect (split-fin (cardinality T)) f
-encode-decode-id {Sum (T :: Ts)} f | inlT f' | inspected eq rewrite encode-decode-id {T} f' | split-fin-left-expand-fin f f' eq = refl
+encode-decode-id {Sum (T :: Ts)} f | inlT f' | inspected eq =
+  trans
+    (cong (λ x → expand-fin x (cardinality (Sum Ts))) (encode-decode-id {T} f'))
+    (sym (split-fin-left-expand-fin f f' eq))
 encode-decode-id {Sum (T :: Ts)} f | inrT f' | inspected eq with decode {Sum Ts} f' | inspect (decode {Sum Ts}) f'
-encode-decode-id {Sum (T :: Ts)} f | inrT f' | inspected eq | choose T' i r | inspected eq' rewrite sym eq' | encode-decode-id {Sum Ts} f' | split-fin-right-shift-fin f f' eq = refl
+encode-decode-id {Sum (T :: Ts)} f | inrT f' | inspected eq | choose T' i r | inspected eq' =
+  trans
+    (cong (λ z → shift-fin (cardinality T) (encode z)) (sym eq'))
+    (trans
+      (cong (shift-fin (cardinality T)) (encode-decode-id {Sum Ts} f'))
+      (split-fin-right-shift-fin f f' eq))
 
 decode-encode-id : {T : Type} (v : Value T) -> decode (encode v) ≡ v
 decode-encode-id unit = refl
 decode-encode-id (choose T (in-z {v = Ts}) v)
   with       split-fin (cardinality T)  (expand-fin (encode v) (cardinality (Sum Ts)))
   | inspect (split-fin (cardinality T)) (expand-fin (encode v) (cardinality (Sum Ts)))
-decode-encode-id (choose T (in-z {v = Ts}) v) | inlT f' | inspected eq rewrite split-fin-after-expand-fin (encode v) (cardinality (Sum Ts)) | sym (remove-inlT eq) | decode-encode-id v = refl
+decode-encode-id (choose T (in-z {v = Ts}) v) | inlT f' | inspected eq = 
+  cong (choose T in-z)
+    (trans
+      (cong decode
+        (remove-inlT
+          (trans (sym eq) (split-fin-after-expand-fin (encode v) (cardinality (Sum Ts))))))
+      (decode-encode-id v))
 decode-encode-id (choose T (in-z {v = Ts}) v) | inrT f' | inspected eq with decode {Sum Ts} f' | inspect (decode {Sum Ts}) f'
-decode-encode-id (choose T (in-z {v = Ts}) v) | inrT f' | inspected eq | choose T' i v' | inspected eq' rewrite split-fin-after-expand-fin (encode v) (cardinality (Sum Ts)) = inl≢inr eq
+decode-encode-id (choose T (in-z {v = Ts}) v) | inrT f' | inspected eq | choose T' i v' | inspected eq' =
+  inl≢inr
+    (trans
+      (sym (split-fin-after-expand-fin (encode v) (cardinality (Sum Ts))))
+      eq)
 decode-encode-id (choose T (in-s T' i) v)
   with       split-fin (cardinality T')  (shift-fin (cardinality T') (encode (choose T i v)))
   | inspect (split-fin (cardinality T')) (shift-fin (cardinality T') (encode (choose T i v)))
-decode-encode-id (choose T (in-s T' i) v) | inlT f' | inspected eq rewrite split-fin-after-shift-fin (cardinality T') (encode (choose T i v)) = inl≢inr (sym eq)
+decode-encode-id (choose T (in-s T' i) v) | inlT f' | inspected eq =
+  inl≢inr
+    (trans
+      (sym eq)
+      (split-fin-after-shift-fin (cardinality T') (encode (choose T i v))))
 decode-encode-id (choose T (in-s T' {v = Ts} i) v) | inrT f' | inspected eq with decode {Sum Ts} f' | inspect (decode {Sum Ts}) f'
-decode-encode-id (choose T (in-s T' {v = Ts} i) v) | inrT f' | inspected eq | choose T″ j r2 | inspected eq' rewrite split-fin-after-shift-fin (cardinality T') (encode (choose T i v)) | sym (remove-inrT eq) | decode-encode-id (choose T i v) = choose-in-s (sym eq')
+decode-encode-id (choose T (in-s T' {v = Ts} i) v) | inrT f' | inspected eq | choose T″ j r2 | inspected eq' =
+  choose-in-s
+    (trans
+      (trans
+        (sym eq')
+        (cong decode (remove-inrT (trans (sym eq) (split-fin-after-shift-fin (cardinality T') (encode (choose T i v)))))))
+      (decode-encode-id (choose T i v)))
 
 module _ where
   _ : encode unit ≡ out-of 1 0
@@ -337,7 +372,16 @@ sigma-fst : {A : Type} {M : Vec Type (cardinality A)} (v : Value (Sigma A M)) �
 sigma-fst (choose T i v) = decode (∈-to-fin i)
 
 sigma-snd : {A : Type} {M : Vec Type (cardinality A)} (v : Value (Sigma A M)) → Value (index-at (encode {A} (sigma-fst v)) M)
-sigma-snd {A} {M} (choose T i v) rewrite encode-decode-id {A} (∈-to-fin i) | index-at-∈-to-fin i = v
+sigma-snd {A} {M} (choose T i v) =
+  subst
+    (trans
+      (sym (index-at-∈-to-fin i))
+      (sym
+        (cong
+          (λ f → index-at f M)
+          (encode-decode-id {A} (∈-to-fin i)))))
+    {Value}
+    v
 
 
 Pi : (A : Type) (M : Vec Type (cardinality A)) → Type
