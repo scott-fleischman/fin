@@ -375,12 +375,18 @@ module _ where
 
   nat+suc-suc : (m n : Nat) → m +N suc n ≡ suc (m +N n)
   nat+suc-suc zero n = refl
-  nat+suc-suc (suc m) zero rewrite nat+0 m | nat+1-suc m = refl
-  nat+suc-suc (suc m) (suc n) rewrite nat+suc-suc m (suc n) = refl
+  nat+suc-suc (suc m) zero =
+    cong suc
+      (trans
+        (nat+1-suc m)
+        (cong suc
+          (sym
+            (nat+0 m))))
+  nat+suc-suc (suc m) (suc n) = cong suc (nat+suc-suc m (suc n))
 
   nat-comm : (m n : Nat) → m +N n ≡ n +N m
   nat-comm zero n = sym (nat+0 n)
-  nat-comm (suc m) n rewrite nat+suc-suc n m | nat-comm m n = refl
+  nat-comm (suc m) n = trans (cong suc (nat-comm m n)) (sym (nat+suc-suc n m))
 
   sum+0 : (A : Type) → cardinality A ≡ cardinality (Sum (A :: N0 :: nil))
   sum+0 A = sym (nat+0 (cardinality A))
@@ -389,7 +395,12 @@ module _ where
   0+sum A = sym (nat+0 (cardinality A))
 
   sum-comm : (A B : Type) → cardinality (Sum (A :: B :: nil)) ≡ cardinality (Sum (B :: A :: nil))
-  sum-comm A B rewrite nat+0 (cardinality A) | nat+0 (cardinality B) | nat-comm (cardinality A) (cardinality B) = refl
+  sum-comm A B = 
+    trans
+      (cong (cardinality A +N_) (nat+0 (cardinality B)))
+      (trans
+        (nat-comm (cardinality A) (cardinality B))
+        (cong (cardinality B +N_) (sym (nat+0 (cardinality A)))))
   
   cardinality-replicate-unit : (t : Nat) → cardinality (Sum (vec-replicate t Unit)) ≡ t
   cardinality-replicate-unit zero = refl
