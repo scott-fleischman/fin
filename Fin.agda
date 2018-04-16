@@ -417,6 +417,10 @@ module _ where
   nat+1-suc zero = refl
   nat+1-suc (suc n) = cong suc (nat+1-suc n)
 
+  nat-assoc : (m n p : Nat) → m +N (n +N p) ≡ (m +N n) +N p
+  nat-assoc zero n p = refl
+  nat-assoc (suc m) n p = cong suc (nat-assoc m n p)
+
   nat+suc-suc : (m n : Nat) → m +N suc n ≡ suc (m +N n)
   nat+suc-suc zero n = refl
   nat+suc-suc (suc m) zero =
@@ -432,20 +436,34 @@ module _ where
   nat-comm zero n = sym (nat+0 n)
   nat-comm (suc m) n = trans (cong suc (nat-comm m n)) (sym (nat+suc-suc n m))
 
-  sum+0 : (A : Type) → cardinality A ≡ cardinality (Sum (A :: N0 :: nil))
-  sum+0 A = sym (nat+0 (cardinality A))
+  -- singleton sums collapse to non-sums
+  collapse-sum : (A : Type) → cardinality A ≡ cardinality (Sum (A :: nil))
+  collapse-sum A = sym (nat+0 (cardinality A))
 
-  0+sum : (A : Type) → cardinality A ≡ cardinality (Sum (N0 :: A :: nil))
-  0+sum A = sym (nat+0 (cardinality A))
+  -- sums with N0 collapse by definition to sums without N0s
+  0+sum-rest : (A : Type) {n : Nat} (As : Vec Type n) → cardinality (Sum (A :: As)) ≡ cardinality (Sum (N0 :: A :: As))
+  0+sum-rest A As = refl
 
-  sum-comm : (A B : Type) → cardinality (Sum (A :: B :: nil)) ≡ cardinality (Sum (B :: A :: nil))
-  sum-comm A B = 
+  sum+0-rest : (A : Type) {n : Nat} (As : Vec Type n) → cardinality (Sum (A :: As)) ≡ cardinality (Sum (A :: N0 :: As))
+  sum+0-rest A As = refl
+
+  -- sums of sums collapse to appended sums
+  sum-concat : {m n : Nat} (Ss : Vec Type m) (Ts : Vec Type n) → cardinality (Sum (Sum Ss :: Sum Ts :: nil)) ≡ cardinality (Sum (vec-append Ss Ts))
+  sum-concat nil Ts = nat+0 (cardinality (Sum Ts))
+  sum-concat (S :: Ss) Ts =
     trans
-      (cong (cardinality A +N_) (nat+0 (cardinality B)))
+      (sym (nat-assoc (cardinality S) (cardinality (Sum Ss)) (cardinality (Sum Ts) +N 0)))
+      (cong (cardinality S +N_) (sum-concat Ss Ts))
+
+  -- can swap order of types in sum
+  sum-comm : (A B : Type) {n : Nat} (Ts : Vec Type n) → cardinality (Sum (A :: B :: Ts)) ≡ cardinality (Sum (B :: A :: Ts))
+  sum-comm A B Ts =
+    trans
+      (nat-assoc (cardinality A) (cardinality B) (cardinality (Sum Ts)))
       (trans
-        (nat-comm (cardinality A) (cardinality B))
-        (cong (cardinality B +N_) (sym (nat+0 (cardinality A)))))
-  
+        (cong (_+N cardinality (Sum Ts)) (nat-comm (cardinality A) (cardinality B)))
+        (sym (nat-assoc (cardinality B) (cardinality A) (cardinality (Sum Ts)))))
+
   cardinality-replicate-unit : (t : Nat) → cardinality (Sum (vec-replicate t Unit)) ≡ t
   cardinality-replicate-unit zero = refl
   cardinality-replicate-unit (suc t) = cong suc (cardinality-replicate-unit t)
