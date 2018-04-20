@@ -3,6 +3,7 @@ module _ where
 open import Agda.Builtin.Nat
   using (Nat; zero; suc)
   renaming (_+_ to _+N_)
+  renaming (_-_ to _-N_)
   renaming (_*_ to _*N_)
 
 open import Agda.Builtin.FromNat
@@ -231,3 +232,24 @@ encode-after-decode {Unit} (fs ())
 encode-after-decode {Sum S T} f with split-fin {size S} {size T} f | inspect (split-fin {size S} {size T}) f
 encode-after-decode {Sum S T} f | inlT x | [ eq ] rewrite encode-after-decode {S} x | split-fin-left-expand-fin f x eq = refl
 encode-after-decode {Sum S T} f | inrT x | [ eq ] rewrite encode-after-decode {T} x | split-fin-right-shift-fin f x eq = refl
+
+
+
+-- For just Unit and Sum, sum-count T = size T.
+-- But if we add Empty, then sum-count will differ,
+-- since Empty will be counted as 1 in sum-count but as 0 in size.
+sum-count : Type → Nat
+sum-count Unit = 1
+sum-count (Sum S T) = sum-count S +N sum-count T
+
+ΣN : Nat → (Nat → Nat) → Nat
+ΣN m@zero f = f m
+ΣN m@(suc n) f = f m +N ΣN n f
+
+{-# TERMINATING #-}
+Catalan : Nat → Nat
+Catalan 0 = 1
+Catalan (suc n) = ΣN n (λ i → Catalan i *N Catalan (n -N i))
+
+encode-type : (T : Type) → Fin (Catalan (sum-count T))
+encode-type T = {!!}
