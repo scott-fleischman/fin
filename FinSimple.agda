@@ -211,15 +211,10 @@ encode (inl {T = T} s) = expand-fin (encode s) (size T)
 encode (inr {S = S} t) = shift-fin (size S) (encode t)
 
 decode : {T : Type} -> Fin (size T) -> Value T
-
-finish-decode : {S T : Type}
-  -> Fin (size S) +T Fin (size T)
-  -> Value (Sum S T)
-finish-decode (inlT x) = inl (decode x)
-finish-decode (inrT x) = inr (decode x)
-
 decode {Unit} f = unit
-decode {Sum S T} f = finish-decode (split-fin {size S} {size T} f)
+decode {Sum S T} f with split-fin {size S} {size T} f
+… | inlT x = inl (decode x)
+… | inrT x = inr (decode x)
 
 decode-after-encode : {T : Type} -> (v : Value T) -> decode (encode v) ≡ v
 decode-after-encode unit = refl
