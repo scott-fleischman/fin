@@ -175,12 +175,12 @@ split-fin-right-shift-fin {suc m} (fsuc x) y p | inr z | inspected eq =
       (cong (shift-fin m) (inr-injective (sym p)))
       (split-fin-right-shift-fin x z eq))
 
-iso-sum-fin
+isoSplit-sum-fin
   : ∀ {A B na nb}
   → Iso A (Fin na)
   → Iso B (Fin nb)
   → IsoSplit A B (Fin (na +ᴺ nb))
-iso-sum-fin {A} {B} {na} {nb}
+isoSplit-sum-fin {A} {B} {na} {nb}
   isoA @ record { encode = encodeA ; decode = decodeA ; left-identity = left-identityA ; right-identity = right-identityA }
   isoB @ record { encode = encodeB ; decode = decodeB ; left-identity = left-identityB ; right-identity = right-identityB }
   =
@@ -212,3 +212,10 @@ iso-sum-fin {A} {B} {na} {nb}
   preserveB f with split f | inspect split f
   preserveB f | inl a | inspected eq = sym (split-fin-left-expand-fin f (encodeA a) (+ᵀ-bimap-inl-op isoA decodeB (split-fin na f) a eq))
   preserveB f | inr b | inspected eq = split-fin-right-shift-fin f (encodeB b) (+ᵀ-bimap-inr-op decodeA isoB (split-fin na f) b eq) 
+
+iso-sum-fin
+  : ∀ {A B na nb}
+  → Iso A (Fin na)
+  → Iso B (Fin nb)
+  → Iso (A +ᵀ B) (Fin (na +ᴺ nb))
+iso-sum-fin isoA isoB = isoSplit-to-iso (isoSplit-sum-fin isoA isoB)
