@@ -28,8 +28,7 @@ trans : {A : Set} -> {x y z : A} -> x ≡ y -> y ≡ z -> x ≡ z
 trans refl refl = refl
 
 data False : Set where
-record True : Set where
-  constructor true
+open import Agda.Builtin.Unit renaming (⊤ to True; tt to true)
 
 instance
   Number-Nat : Number Nat

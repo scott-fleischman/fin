@@ -34,9 +34,8 @@ subst : {A : Set} {x y : A} (p : x ≡ y) {P : A → Set} (Px : P x) → P y
 subst refl Px = Px
 
 data False : Set where
-record True : Set where
-  constructor true
 
+open import Agda.Builtin.Unit renaming (⊤ to True; tt to true)
 
 record Σ (A : Set) (B : A → Set) : Set where
   constructor _,_
